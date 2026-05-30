@@ -17,20 +17,27 @@ app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required.' });
+    return res.status(400).json({ success: false, error: 'Username and password are required.' });
   }
 
+  // Hardcoded Admin fallback
   if (username.toLowerCase() === 'admin' && password === 'admin') {
-    return res.json({ username: 'Admin', role: 'admin' });
+    return res.json({ 
+      success: true, 
+      user: { id: 1, username: 'Admin', role: 'admin' } 
+    });
   }
 
-  const sql = 'SELECT username, role, password FROM users WHERE LOWER(username) = LOWER(?)';
+  const sql = 'SELECT id, username, role, password FROM users WHERE LOWER(username) = LOWER(?)';
   db.get(sql, [username], (err, row: any) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) return res.status(500).json({ success: false, error: err.message });
     if (!row || row.password !== password) {
-      return res.status(401).json({ error: 'Invalid username or password.' });
+      return res.status(401).json({ success: false, error: 'Invalid username or password.' });
     }
-    res.json({ username: row.username, role: row.role });
+    res.json({ 
+      success: true, 
+      user: { id: row.id, username: row.username, role: row.role } 
+    });
   });
 });
 
