@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
-interface User {
-  username: string;
-  role: 'admin' | 'employee';
+interface DashboardProps {
+  user: { username: string; role: string };
+  onLogout: () => void;
 }
 
 interface Entry {
@@ -13,30 +13,40 @@ interface Entry {
   date: string;
 }
 
-interface DashboardProps {
-  user: User;
-  onLogout: () => void;
+interface UserList {
+  id: number;
+  username: string;
+  role: string;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
+// 🌐 CLEANED: Correct backend cloud URL with no errors attached
+const BACKEND_URL = 'https://time-tracker-app.onrender.com';
+
+export function Dashboard({ user, onLogout }: DashboardProps) {
   const [entries, setEntries] = useState<Entry[]>([]);
-  const [users, setUsers] = useState<string[]>([]);
+  const [users, setUsers] = useState<UserList[]>([]);
+  
+  // Log Entry Form State
+  const [employeeName, setEmployeeName] = useState('');
   const [orderedAmount, setOrderedAmount] = useState('');
   const [bringBackAmount, setBringBackAmount] = useState('');
-  const [selectedEmployee, setSelectedEmployee] = useState('');
-  const [newUsername, setNewUsername] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [newRole, setNewRole] = useState<'admin' | 'employee'>('employee');
-  const [message, setMessage] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const BACKEND_URL = 'https://time-tracker-app-w8vf.onrender.com';
+  // Account Registration Form State
+  const [regUsername, setRegUsername] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regRole, setRegRole] = useState('employee');
+
+  // Status Banners
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchEntries();
     if (user.role === 'admin') {
       fetchUsers();
     }
-  }, [user]);
+  }, []);
 
   const fetchEntries = async () => {
     try {
@@ -52,9 +62,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const fetchUsers = async () => {
     try {
-      const uRes = await fetch(`${BACKEND_URL}/api/users`);
-      if (uRes.ok) {
-        const data = await uRes.json();
+      const res = await fetch(`${BACKEND_URL}/api/users`);
+      if (res.ok) {
+        const data = await res.json();
         setUsers(data);
       }
     } catch (err) {
@@ -62,36 +72,17 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     }
   };
 
-  const handleRegisterUser = async (e: React.FormEvent) => {
+  // Action 1: Handle Log Entry Submission
+  const handleSaveEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage('');
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/users/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: newUsername, password: newPassword, role: newRole }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setMessage(`Success: ${data.message}`);
-        setNewUsername('');
-        setNewPassword('');
-        fetchUsers();
-      } else {
-        setMessage(`Error: ${data.error}`);
-      }
-    } catch (err) {
-      setMessage('Failed to register user connection.');
-    }
-  };
+    setError('');
 
-  const handleSubmitEntry = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setMessage('');
+    // If logged in as an employee, force their own name automatically
+    const submittedName = user.role === 'admin' ? employeeName : user.username;
 
-    const targetEmployee = user.role === 'admin' ? selectedEmployee : user.username;
-    if (!targetEmployee) {
-      setMessage('Error: Please select or verify an employee name.');
+    if (!submittedName) {
+      setError('Please select or provide an employee name. [Bitte Mitarbeiter auswählen]');
       return;
     }
 
@@ -100,159 +91,160 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          employeeName: targetEmployee,
+          employeeName: submittedName,
           orderedAmount,
           bringBackAmount,
-          date: new Date().toISOString().split('T')[0],
-        }),
+          date
+        })
       });
 
-      const data = await res.json();
       if (res.ok) {
-        setMessage('Tracking entry saved successfully!');
+        setMessage('Entry saved successfully! [Eintrag erfolgreich gespeichert]');
         setOrderedAmount('');
         setBringBackAmount('');
-        fetchEntries();
+        if (user.role === 'admin') setEmployeeName('');
+        fetchEntries(); // Refresh list instantly
       } else {
-        setMessage(`Error: ${data.error}`);
+        setError('Failed to save tracking data. [Eintrag konnte nicht gespeichert werden]');
       }
     } catch (err) {
-      setMessage('Failed to submit inventory entry to server.');
+      setError('Server network connection failed. [Verbindung zum Server fehlgeschlagen]');
+    }
+  };
+
+  // Action 2: Handle New Staff Account Registration
+  const handleRegisterUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage('');
+    setError('');
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/users/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: regUsername, password: regPassword, role: regRole })
+      });
+
+      if (res.ok) {
+        setMessage(`Account for "${regUsername}" successfully created!`);
+        setRegUsername('');
+        setRegPassword('');
+        fetchUsers(); // Refresh list instantly
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to register account.');
+      }
+    } catch (err) {
+      setError('Failed to process registration connection.');
     }
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #ccc', paddingBottom: '10px' }}>
-        <h2>Time Tracker <span style={{ fontSize: '14px', color: '#666' }}>[Bilingual System]</span></h2>
+    <div style={{ padding: '24px', fontFamily: 'system-ui, sans-serif', maxWidth: '900px', margin: '0 auto' }}>
+      {/* Top Title Bar */}
+      <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #e5e7eb', paddingBottom: '16px' }}>
+        <h2>Time Tracker <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#6b7280' }}>[Bilingual System]</span></h2>
         <div>
-          <span style={{ marginRight: '15px' }}><strong>User:</strong> {user.username} ({user.role})</span>
-          <button onClick={onLogout} style={{ padding: '5px 10px', cursor: 'pointer' }}>Logout [Abmelden]</button>
+          <span style={{ marginRight: '12px' }}>User: <strong>{user.username} ({user.role})</strong></span>
+          <button onClick={onLogout} style={{ padding: '6px 12px', cursor: 'pointer' }}>Logout [Abmelden]</button>
         </div>
-      </header>
+      </div>
 
-      {message && (
-        <div style={{ margin: '15px 0', padding: '10px', backgroundColor: '#e0f7fa', borderRadius: '4px', border: '1px solid #00acc1' }}>
-          {message}
-        </div>
-      )}
+      {/* Alert Banners */}
+      {message && <div style={{ background: '#ecfdf5', color: '#065f46', padding: '12px', borderRadius: '6px', marginBottom: '16px', border: '1px solid #a7f3d0' }}>{message}</div>}
+      {error && <div style={{ background: '#fef2f2', color: '#991b1b', padding: '12px', borderRadius: '6px', marginBottom: '16px', border: '1px solid #fca5a5' }}>{error}</div>}
 
-      <main style={{ display: 'flex', gap: '4px', marginTop: '20px', flexDirection: 'column' }}>
-        {/* INPUT FORM SECTION */}
-        <section style={{ flex: 1, padding: '20px', border: '1px solid #ddd', borderRadius: '8px', backgroundColor: '#f9f9f9' }}>
-          <h3>Add Log Entry <span style={{ fontSize: '14px', color: '#666' }}>[Eintrag hinzufügen]</span></h3>
-          <form onSubmit={handleSubmitEntry} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            {user.role === 'admin' && (
-              <div>
-                <label style={{ display: 'block', marginBottom: '5px' }}>Select Employee [Mitarbeiter auswählen]:</label>
-                <select 
-                  value={selectedEmployee} 
-                  onChange={(e) => setSelectedEmployee(e.target.value)}
-                  style={{ width: '100%', padding: '8px' }}
-                  required
-                >
-                  <option value="">-- Choose Staff --</option>
-                  {users.map((u) => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                </select>
-              </div>
+      {/* FORM: Add Material Entry */}
+      <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '20px', marginBottom: '24px' }}>
+        <h3>Add Log Entry <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#6b7280' }}>[Eintrag hinzufügen]</span></h3>
+        <form onSubmit={handleSaveEntry}>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600' }}>Select Employee [Mitarbeiter auswählen]:</label>
+            {user.role === 'admin' ? (
+              <select value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} style={{ width: '100%', padding: '8px' }}>
+                <option value="">-- Choose Staff --</option>
+                {users.map(u => <option key={u.id} value={u.username}>{u.username} ({u.role})</option>)}
+              </select>
+            ) : (
+              <input type="text" value={user.username} disabled style={{ width: '100%', padding: '8px', background: '#f3f4f6' }} />
             )}
+          </div>
 
-            <div>
-              <label style={{ display: 'block', marginBottom: '5px' }}>Ordered Amount of Material [Bestellte Materialmenge]:</label>
-              <textarea
-                value={orderedAmount}
-                onChange={(e) => setOrderedAmount(e.target.value)}
-                placeholder="e.g., 2 Bleach, 5kg Laundry Powder, Gloves"
-                style={{ width: '100%', padding: '8px', height: '60px' }}
-              />
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600' }}>Ordered Amount of Material [Bestellte Materialmenge]:</label>
+            <textarea value={orderedAmount} onChange={(e) => setOrderedAmount(e.target.value)} placeholder="e.g., 2 Bleach, 5kg Laundry Powder, Gloves" style={{ width: '100%', padding: '8px', height: '60px' }} />
+          </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600' }}>Bring Back Amount of Materials [Zurückgebrachte Materialmenge]:</label>
+            <textarea value={bringBackAmount} onChange={(e) => setBringBackAmount(e.target.value)} placeholder="e.g., 1 Bleach left, 1kg Powder returned" style={{ width: '100%', padding: '8px', height: '60px' }} />
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600' }}>Date [Datum]:</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: '100%', padding: '8px' }} />
+          </div>
+
+          <button type="submit" style={{ width: '100%', padding: '10px', background: '#22c55e', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
+            Save Entry [Eintrag speichern]
+          </button>
+        </form>
+      </div>
+
+      {/* ADMIN PANEL: Register Staff Accounts */}
+      {user.role === 'admin' && (
+        <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '20px', marginBottom: '24px' }}>
+          <h3>Register New Staff Account <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#6b7280' }}>[Mitarbeiter registrieren]</span></h3>
+          <form onSubmit={handleRegisterUser}>
+            <div style={{ marginBottom: '12px' }}>
+              <input type="text" placeholder="Username" value={regUsername} onChange={(e) => setRegUsername(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
             </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: '5px' }}>Bring Back Amount of Materials [Zurückgebrachte Materialmenge]:</label>
-              <textarea
-                value={bringBackAmount}
-                onChange={(e) => setBringBackAmount(e.target.value)}
-                placeholder="e.g., 1 Bleach left, 1kg Powder returned"
-                style={{ width: '100%', padding: '8px', height: '60px' }}
-              />
+            <div style={{ marginBottom: '12px' }}>
+              <input type="password" placeholder="Password" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
             </div>
-
-            <button type="submit" style={{ padding: '10px', backgroundColor: '#4caf50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-              Save Entry [Eintrag speichern]
-            </button>
-          </form>
-        </section>
-
-        {/* ADMIN USER REGISTRATION CONTROL PANEL */}
-        {user.role === 'admin' && (
-          <section style={{ flex: 1, padding: '20px', border: '1px solid #ddd', borderRadius: '8px', backgroundColor: '#f9f9f9', marginTop: '20px' }}>
-            <h3>Register New Staff Account <span style={{ fontSize: '14px', color: '#666' }}>[Mitarbeiter registrieren]</span></h3>
-            <form onSubmit={handleRegisterUser} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <input
-                type="text"
-                placeholder="Username [Benutzername]"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                style={{ padding: '8px' }}
-                required
-              />
-              <input
-                type="password"
-                placeholder="Password [Passwort]"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                style={{ padding: '8px' }}
-                required
-              />
-              <select value={newRole} onChange={(e) => setNewRole(e.target.value as 'admin' | 'employee')} style={{ padding: '8px' }}>
+            <div style={{ marginBottom: '12px' }}>
+              <select value={regRole} onChange={(e) => setRegRole(e.target.value)} style={{ width: '100%', padding: '8px' }}>
                 <option value="employee">Employee [Mitarbeiter]</option>
                 <option value="admin">Administrator [Admin]</option>
               </select>
-              <button type="submit" style={{ padding: '10px', backgroundColor: '#2196f3', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-                Create Account [Konto erstellen]
-              </button>
-            </form>
-          </section>
-        )}
+            </div>
+            <button type="submit" style={{ width: '100%', padding: '10px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
+              Create Account [Konto erstellen]
+            </button>
+          </form>
+        </div>
+      )}
 
-        {/* DATA DISPLAY LOGS TABLE */}
-        <section style={{ width: '100%', marginTop: '20px' }}>
-          <h3>Tracking Logs Records <span style={{ fontSize: '14px', color: '#666' }}>[Protokolleinträge]</span></h3>
-          <p style={{ fontSize: '12px', color: '#e53935', fontStyle: 'italic' }}>
-            * Note: Employees cannot edit or delete data logs after entry submission. [Mitarbeiter können Einträge nach dem Absenden nicht bearbeiten oder löschen.]
-          </p>
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f2f2f2', textAlign: 'left', borderBottom: '2px solid #ddd' }}>
-                <th style={{ padding: '12px', border: '1px solid #ddd' }}>Date</th>
-                <th style={{ padding: '12px', border: '1px solid #ddd' }}>Employee Name</th>
-                <th style={{ padding: '12px', border: '1px solid #ddd' }}>Ordered Amount of Material</th>
-                <th style={{ padding: '12px', border: '1px solid #ddd' }}>Bring Back Amount of Materials</th>
+      {/* LOG DATA VIEWER TABLE */}
+      <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '20px' }}>
+        <h3>Logged Data Entries <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#6b7280' }}>[Gespeicherte Einträge]</span></h3>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '12px' }}>
+          <thead>
+            <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
+              <th style={{ padding: '10px', border: '1px solid #e5e7eb' }}>Date</th>
+              <th style={{ padding: '10px', border: '1px solid #e5e7eb' }}>Employee</th>
+              <th style={{ padding: '10px', border: '1px solid #e5e7eb' }}>Ordered Material</th>
+              <th style={{ padding: '10px', border: '1px solid #e5e7eb' }}>Bring Back Material</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.length === 0 ? (
+              <tr>
+                <td colSpan={4} style={{ padding: '12px', textAlign: 'center', color: '#9ca3af' }}>No logging records found.</td>
               </tr>
-            </thead>
-            <tbody>
-              {entries.length === 0 ? (
-                <tr>
-                  <td colSpan={4} style={{ padding: '15px', textAlign: 'center', color: '#999' }}>No data records found.</td>
+            ) : (
+              entries.map(entry => (
+                <tr key={entry.id}>
+                  <td style={{ padding: '10px', border: '1px solid #e5e7eb' }}>{entry.date}</td>
+                  <td style={{ padding: '10px', border: '1px solid #e5e7eb' }}>{entry.employeeName}</td>
+                  <td style={{ padding: '10px', border: '1px solid #e5e7eb', whiteSpace: 'pre-wrap' }}>{entry.orderedAmount}</td>
+                  <td style={{ padding: '10px', border: '1px solid #e5e7eb', whiteSpace: 'pre-wrap' }}>{entry.bringBackAmount}</td>
                 </tr>
-              ) : (
-                entries.map((entry) => (
-                  <tr key={entry.id} style={{ borderBottom: '1px solid #ddd' }}>
-                    <td style={{ padding: '12px', border: '1px solid #ddd' }}>{entry.date}</td>
-                    <td style={{ padding: '12px', border: '1px solid #ddd' }}><strong>{entry.employeeName}</strong></td>
-                    <td style={{ padding: '12px', border: '1px solid #ddd', whiteSpace: 'pre-wrap' }}>{entry.orderedAmount || '-'}</td>
-                    <td style={{ padding: '12px', border: '1px solid #ddd', whiteSpace: 'pre-wrap' }}>{entry.bringBackAmount || '-'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </section>
-      </main>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
-};
-
-export default Dashboard;
+}
