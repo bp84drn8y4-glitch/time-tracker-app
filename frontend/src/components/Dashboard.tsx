@@ -5,245 +5,537 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
-interface Entry {
-  id: number;
-  employeeName: string;
-  orderedAmount: string;
-  bringBackAmount: string;
-  date: string;
+interface MaterialItem {
+  nameDe: string;
+  nameEn: string;
+  specification?: string;
+  ordered: number;
+  returned: number;
+  description?: string;
 }
-
-interface UserList {
-  id: number;
-  username: string;
-  role: string;
-}
-
-// 🌐 CLEANED: Correct backend cloud URL with no errors attached
-const BACKEND_URL = 'https://time-tracker-app-w8vf.onrender.com';
 
 export function Dashboard({ user, onLogout }: DashboardProps) {
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [users, setUsers] = useState<UserList[]>([]);
+  const isAdmin = user.role.toLowerCase() === 'admin';
+  const API_URL = 'https://time-tracker-app-w8vf.onrender.com/api';
+
+  // 🏢 Dropdown Context State Fields
+  const [selectedBusiness, setSelectedBusiness] = useState('Fürst Hauser Gebäudereinigung');
+  const [selectedEmployee, setSelectedEmployee] = useState('');
+  const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
   
-  // Log Entry Form State
-  const [employeeName, setEmployeeName] = useState('');
-  const [orderedAmount, setOrderedAmount] = useState('');
-  const [bringBackAmount, setBringBackAmount] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  // ⏰ Time State Fields
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  
+  // 👤 Admin Account Creation State Fields
+  const [newUsername, setNewUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newRole, setNewRole] = useState('employee');
 
-  // Account Registration Form State
-  const [regUsername, setRegUsername] = useState('');
-  const [regPassword, setRegPassword] = useState('');
-  const [regRole, setRegRole] = useState('employee');
-
-  // Status Banners
+  // 📊 Core App Lists Saved From Database
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [entries, setEntries] = useState<any[]>([]);
   const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [adminSectionMessage, setAdminSectionMessage] = useState('');
+
+  // 📦 Material Lists Configurations
+  const initialFurstHauser: MaterialItem[] = [
+    { nameDe: 'Müllbeutel Groß', nameEn: 'Large trash bags', specification: '120 L', ordered: 0, returned: 0 },
+    { nameDe: 'Müllbeutel Medium', nameEn: 'Medium trash bags', specification: '60 L', ordered: 0, returned: 0 },
+    { nameDe: 'Müllbeutel Klein', nameEn: 'Small trash bags', specification: '28 L', ordered: 0, returned: 0 },
+    { nameDe: 'Wischmopp Mikrofaser', nameEn: 'Microfiber mop', specification: '50 cm', ordered: 0, returned: 0 },
+    { nameDe: 'Wischmopp Baumwolle', nameEn: 'Cotton mop', specification: '50 cm', ordered: 0, returned: 0 },
+    { nameDe: 'Mikrofaser Lappen rot', nameEn: 'Red microfiber cloths', specification: '40 x 40 cm', ordered: 0, returned: 0 },
+    { nameDe: 'Mikrofaser Lappen blau', nameEn: 'Blue microfiber cloths', specification: '40 x 40 cm', ordered: 0, returned: 0 },
+    { nameDe: 'Mikrofaser Lappen grün', nameEn: 'Green microfiber cloths', specification: '40 x 40 cm', ordered: 0, returned: 0 },
+    { nameDe: 'Mikrofaser Lappen gelb', nameEn: 'Yellow microfiber cloths', specification: '40 x 40 cm', ordered: 0, returned: 0 },
+    { nameDe: 'Geschirrtücher', nameEn: 'Kitchen / Dish towels', specification: '70 x 50 cm', ordered: 0, returned: 0 },
+    { nameDe: 'Sprühflasche Sanitärreiniger Milizid', nameEn: 'Spray bottle Bathroom cleaner', specification: '', ordered: 0, returned: 0 },
+    { nameDe: 'Bodenreiniger Torrun Konzentrat', nameEn: 'Floor cleaner concentrate', specification: '', ordered: 0, returned: 0 },
+    { nameDe: 'Oberflächenreiniger', nameEn: 'Surface cleaner', specification: '', ordered: 0, returned: 0 },
+    { nameDe: 'Toilettenpapier', nameEn: 'Toilet paper', specification: '', ordered: 0, returned: 0 },
+    { nameDe: 'Falthandtücher', nameEn: 'Folded hand towels', specification: '', ordered: 0, returned: 0 },
+    { nameDe: 'Handseife', nameEn: 'Hand soap', specification: '10 Liter', ordered: 0, returned: 0 },
+    { nameDe: 'Sonstiges', nameEn: 'Miscellaneous', specification: '', ordered: 0, returned: 0, description: '' }
+  ];
+
+  const initialWaschsalon: MaterialItem[] = [
+    { nameDe: 'Handfolien', nameEn: 'Plastic gloves / Hand films', specification: '', ordered: 0, returned: 0 },
+    { nameDe: 'Bügelstärke', nameEn: 'Ironing starch / Spray starch', specification: '', ordered: 0, returned: 0 },
+    { nameDe: 'Chlor', nameEn: 'Chlorine / Bleach', specification: '', ordered: 0, returned: 0 },
+    { nameDe: 'Waschpulver', nameEn: 'Laundry powder', specification: '20 kg', ordered: 0, returned: 0 },
+    { nameDe: 'Weichspüler', nameEn: 'Fabric softener', specification: '20 lit', ordered: 0, returned: 0 },
+    { nameDe: 'Sonstiges', nameEn: 'Miscellaneous', specification: '', ordered: 0, returned: 0, description: '' }
+  ];
+
+  const [materials, setMaterials] = useState<MaterialItem[]>(initialFurstHauser);
 
   useEffect(() => {
-    fetchEntries();
-    if (user.role === 'admin') {
-      fetchUsers();
+    if (selectedBusiness === 'Fürst Hauser Gebäudereinigung') {
+      setMaterials(initialFurstHauser);
+    } else {
+      setMaterials(initialWaschsalon);
     }
+  }, [selectedBusiness]);
+
+  useEffect(() => {
+    fetchEmployees();
+    fetchEntries();
   }, []);
+
+  const fetchEmployees = async () => {
+    try {
+      const res = await fetch(`${API_URL}/users`);
+      if (res.ok) {
+        const data = await res.json();
+        setEmployees(data.filter((u: any) => u.role !== 'admin'));
+      }
+    } catch (err) { console.error('Error loading employees:', err); }
+  };
 
   const fetchEntries = async () => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/entries?employee=${encodeURIComponent(user.username)}&role=${user.role}`);
-      if (res.ok) {
-        const data = await res.json();
-        setEntries(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch entries:', err);
-    }
+      const res = await fetch(`${API_URL}/entries`);
+      if (res.ok) setEntries(await res.json());
+    } catch (err) { console.error('Error loading entries history:', err); }
   };
 
-  const fetchUsers = async () => {
+  // 🧮 Fixed Helper Function: Correctly handles blank values or text status flags sent by database
+  const calculateHoursDuration = (start: string, end: string): number => {
+    if (!start || !end || start.includes('Not') || end.includes('Not') || start === '—' || end === '—') return 0;
+    
     try {
-      const res = await fetch(`${BACKEND_URL}/api/users`);
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch users:', err);
+      const [startH, startM] = start.split(':').map(Number);
+      const [endH, endM] = end.split(':').map(Number);
+      
+      if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return 0;
+
+      let diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+      if (diffMinutes < 0) diffMinutes += 24 * 60; // Handles overnight late shifts seamlessly
+      
+      return parseFloat((diffMinutes / 60).toFixed(2));
+    } catch (e) {
+      return 0;
     }
   };
 
-  // Action 1: Handle Log Entry Submission
+  // 🗓️ Helper Function: Dynamic case-insensitive rolling accumulator
+  const getMonthlyRollup = (userEntries: any[]) => {
+    const monthlyTotals: { [key: string]: number } = {};
+    userEntries.forEach(entry => {
+      if (!entry.date) return;
+      const monthKey = entry.date.substring(0, 7); // Layout key format: 'YYYY-MM'
+      const shiftHours = calculateHoursDuration(entry.startTime, entry.endTime);
+      monthlyTotals[monthKey] = (monthlyTotals[monthKey] || 0) + shiftHours;
+    });
+    return monthlyTotals;
+  };
+
+  // 🔒 Fixed Data Filtration: Converts names to lowercase to bypass capitalization matching bugs
+  const displayedEntries = isAdmin 
+    ? entries 
+    : entries.filter(e => e.employeeName && user.username && e.employeeName.toLowerCase().trim() === user.username.toLowerCase().trim());
+
+  const employeeMonthlySummary = getMonthlyRollup(displayedEntries);
+
+  // Admin global accounting rollover compiler tool
+  const getAdminPayrollRollup = () => {
+    const payrollMap: { [key: string]: { [employee: string]: number } } = {};
+    
+    // Seed initial structure with all registered employees to ensure 0 hour profiles display perfectly
+    const currentMonthStr = new Date().toISOString().substring(0, 7);
+    payrollMap[currentMonthStr] = {};
+    employees.forEach(emp => {
+      if(emp.username) payrollMap[currentMonthStr][emp.username] = 0;
+    });
+
+    entries.forEach(entry => {
+      if (!entry.date || !entry.employeeName) return;
+      const monthKey = entry.date.substring(0, 7);
+      const shiftHours = calculateHoursDuration(entry.startTime, entry.endTime);
+      
+      if (!payrollMap[monthKey]) payrollMap[monthKey] = {};
+      
+      // Look up existing keys using a flexible, case-insensitive match
+      const matchedKey = Object.keys(payrollMap[monthKey]).find(k => k.toLowerCase() === entry.employeeName.toLowerCase()) || entry.employeeName;
+      payrollMap[monthKey][matchedKey] = (payrollMap[monthKey][matchedKey] || 0) + shiftHours;
+    });
+    return payrollMap;
+  };
+
+  const adminPayrollData = getAdminPayrollRollup();
+
+  const handleCreateEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminSectionMessage('');
+    if (!newUsername || !newPassword) {
+      setAdminSectionMessage('Fehler: Bitte füllen Sie alle Felder aus.');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/users/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: newUsername.trim(), password: newPassword, role: newRole })
+      });
+      if (res.ok) {
+        setAdminSectionMessage(`Konto für "${newUsername}" erfolgreich erstellt!`);
+        setNewUsername('');
+        setNewPassword('');
+        setNewRole('employee');
+        fetchEmployees();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setAdminSectionMessage(`Fehler: ${errData.message || 'Konto konnte nicht erstellt werden.'}`);
+      }
+    } catch (err) { setAdminSectionMessage('Verbindungsfehler bei der Registrierung.'); }
+  };
+
+  const handleCountChange = (index: number, field: 'ordered' | 'returned', operation: 'up' | 'down') => {
+    setMaterials(prev => prev.map((item, idx) => {
+      if (idx !== index) return item;
+      const currentVal = item[field];
+      const newVal = operation === 'up' ? currentVal + 1 : Math.max(0, currentVal - 1);
+      return { ...item, [field]: newVal };
+    }));
+  };
+
+  const handleDescriptionChange = (index: number, value: string) => {
+    setMaterials(prev => prev.map((item, idx) => {
+      if (idx !== index) return item;
+      return { ...item, description: value };
+    }));
+  };
+
   const handleSaveEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage('');
-    setError('');
 
-    // If logged in as an employee, force their own name automatically
-    const submittedName = user.role === 'admin' ? employeeName : user.username;
+    const targetEmployee = isAdmin ? selectedEmployee : user.username;
+    if (!targetEmployee) {
+      setMessage('Fehler: Bitte wählen Sie einen Mitarbeiter aus. (Select an Employee)');
+      return;
+    }
 
-    if (!submittedName) {
-      setError('Please select or provide an employee name. [Bitte Mitarbeiter auswählen]');
+    const activeChanges = materials.filter(m => m.ordered > 0 || m.returned > 0 || (m.nameDe === 'Sonstiges' && m.description));
+    
+    // Explicitly check for valid timestamps to prevent dead blank submission payloads
+    const hasTimeInput = startTime.trim() !== '' && endTime.trim() !== '';
+    if (activeChanges.length === 0 && !hasTimeInput) {
+      setMessage('Fehler: Bitte tragen Sie Arbeitszeiten ein oder verändern Sie Materialzähler.');
       return;
     }
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/entries`, {
+      const payload = {
+        employeeName: targetEmployee,
+        business: selectedBusiness,
+        date: entryDate,
+        startTime: startTime || 'Not logged',
+        endTime: endTime || 'Not logged',
+        materialsList: activeChanges
+      };
+
+      const res = await fetch(`${API_URL}/entries`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          employeeName: submittedName,
-          orderedAmount,
-          bringBackAmount,
-          date
-        })
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
-        setMessage('Entry saved successfully! [Eintrag erfolgreich gespeichert]');
-        setOrderedAmount('');
-        setBringBackAmount('');
-        if (user.role === 'admin') setEmployeeName('');
-        fetchEntries(); // Refresh list instantly
+        setMessage('Eintrag erfolgreich gespeichert! (Saved successfully)');
+        setMaterials(prev => prev.map(m => ({ ...m, ordered: 0, returned: 0, description: '' })));
+        setStartTime('');
+        setEndTime('');
+        fetchEntries();
       } else {
-        setError('Failed to save tracking data. [Eintrag konnte nicht gespeichert werden]');
+        setMessage('Fehler beim Speichern der Modelldaten.');
       }
-    } catch (err) {
-      setError('Server network connection failed. [Verbindung zum Server fehlgeschlagen]');
-    }
-  };
-
-  // Action 2: Handle New Staff Account Registration
-  const handleRegisterUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setMessage('');
-    setError('');
-
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/users/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: regUsername, password: regPassword, role: regRole })
-      });
-
-      if (res.ok) {
-        setMessage(`Account for "${regUsername}" successfully created!`);
-        setRegUsername('');
-        setRegPassword('');
-        fetchUsers(); // Refresh list instantly
-      } else {
-        const data = await res.json();
-        setError(data.error || 'Failed to register account.');
-      }
-    } catch (err) {
-      setError('Failed to process registration connection.');
-    }
+    } catch (err) { setMessage('Verbindungsfehler zum Cloud-Server.'); }
   };
 
   return (
-    <div style={{ padding: '24px', fontFamily: 'system-ui, sans-serif', maxWidth: '900px', margin: '0 auto' }}>
-      {/* Top Title Bar */}
-      <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '24px', borderBottom: '1px solid #e5e7eb', paddingBottom: '16px' }}>
-        <h2>Time Tracker <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#6b7280' }}>[Bilingual System]</span></h2>
+    <div style={{ padding: '30px', maxWidth: '1550px', margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
+      
+      {/* Upper Navigation Row bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', borderBottom: '2px solid #e2e8f0', paddingBottom: '15px' }}>
         <div>
-          <span style={{ marginRight: '12px' }}>User: <strong>{user.username} ({user.role})</strong></span>
-          <button onClick={onLogout} style={{ padding: '6px 12px', cursor: 'pointer' }}>Logout [Abmelden]</button>
+          <h1 style={{ margin: 0, fontSize: '26px', color: '#0f172a' }}>Time Tracker</h1>
+          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '14px' }}>Angemeldet als: <strong style={{ color: '#1e293b' }}>{user.username}</strong> ({user.role})</p>
         </div>
+        <button onClick={onLogout} style={{ padding: '10px 18px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
+          Abmelden (Logout)
+        </button>
       </div>
 
-      {/* Alert Banners */}
-      {message && <div style={{ background: '#ecfdf5', color: '#065f46', padding: '12px', borderRadius: '6px', marginBottom: '16px', border: '1px solid #a7f3d0' }}>{message}</div>}
-      {error && <div style={{ background: '#fef2f2', color: '#991b1b', padding: '12px', borderRadius: '6px', marginBottom: '16px', border: '1px solid #fca5a5' }}>{error}</div>}
-
-      {/* FORM: Add Material Entry */}
-      <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '20px', marginBottom: '24px' }}>
-        <h3>Add Log Entry <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#6b7280' }}>[Eintrag hinzufügen]</span></h3>
-        <form onSubmit={handleSaveEntry}>
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600' }}>Select Employee [Mitarbeiter auswählen]:</label>
-            {user.role === 'admin' ? (
-              <select value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} style={{ width: '100%', padding: '8px' }}>
-                <option value="">-- Choose Staff --</option>
-                {users.map(u => <option key={u.id} value={u.username}>{u.username} ({u.role})</option>)}
-              </select>
-            ) : (
-              <input type="text" value={user.username} disabled style={{ width: '100%', padding: '8px', background: '#f3f4f6' }} />
-            )}
-          </div>
-
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600' }}>Ordered Amount of Material [Bestellte Materialmenge]:</label>
-            <textarea value={orderedAmount} onChange={(e) => setOrderedAmount(e.target.value)} placeholder="e.g., 2 Bleach, 5kg Laundry Powder, Gloves" style={{ width: '100%', padding: '8px', height: '60px' }} />
-          </div>
-
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600' }}>Bring Back Amount of Materials [Zurückgebrachte Materialmenge]:</label>
-            <textarea value={bringBackAmount} onChange={(e) => setBringBackAmount(e.target.value)} placeholder="e.g., 1 Bleach left, 1kg Powder returned" style={{ width: '100%', padding: '8px', height: '60px' }} />
-          </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600' }}>Date [Datum]:</label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: '100%', padding: '8px' }} />
-          </div>
-
-          <button type="submit" style={{ width: '100%', padding: '10px', background: '#22c55e', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
-            Save Entry [Eintrag speichern]
-          </button>
-        </form>
-      </div>
-
-      {/* ADMIN PANEL: Register Staff Accounts */}
-      {user.role === 'admin' && (
-        <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '20px', marginBottom: '24px' }}>
-          <h3>Register New Staff Account <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#6b7280' }}>[Mitarbeiter registrieren]</span></h3>
-          <form onSubmit={handleRegisterUser}>
-            <div style={{ marginBottom: '12px' }}>
-              <input type="text" placeholder="Username" value={regUsername} onChange={(e) => setRegUsername(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
-            </div>
-            <div style={{ marginBottom: '12px' }}>
-              <input type="password" placeholder="Password" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
-            </div>
-            <div style={{ marginBottom: '12px' }}>
-              <select value={regRole} onChange={(e) => setRegRole(e.target.value)} style={{ width: '100%', padding: '8px' }}>
-                <option value="employee">Employee [Mitarbeiter]</option>
-                <option value="admin">Administrator [Admin]</option>
-              </select>
-            </div>
-            <button type="submit" style={{ width: '100%', padding: '10px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
-              Create Account [Konto erstellen]
-            </button>
-          </form>
+      {message && (
+        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', padding: '12px', borderRadius: '8px', marginBottom: '25px', fontSize: '14px', fontWeight: '500' }}>
+          {message}
         </div>
       )}
 
-      {/* LOG DATA VIEWER TABLE */}
-      <div style={{ background: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '20px' }}>
-        <h3>Logged Data Entries <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#6b7280' }}>[Gespeicherte Einträge]</span></h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '12px' }}>
-          <thead>
-            <tr style={{ background: '#f3f4f6', textAlign: 'left' }}>
-              <th style={{ padding: '10px', border: '1px solid #e5e7eb' }}>Date</th>
-              <th style={{ padding: '10px', border: '1px solid #e5e7eb' }}>Employee</th>
-              <th style={{ padding: '10px', border: '1px solid #e5e7eb' }}>Ordered Material</th>
-              <th style={{ padding: '10px', border: '1px solid #e5e7eb' }}>Bring Back Material</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.length === 0 ? (
-              <tr>
-                <td colSpan={4} style={{ padding: '12px', textAlign: 'center', color: '#9ca3af' }}>No logging records found.</td>
-              </tr>
+      {/* Main Column Grid Splits layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1.25fr 1fr' : '1fr 1fr', gap: '35px', alignItems: 'start' }}>
+        
+        {/* LEFT COMPONENT COLUMN: ENTRY ENTRY SHEET FORM PANEL */}
+        <div style={{ background: '#ffffff', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+          <h2 style={{ marginTop: 0, marginBottom: '20px', fontSize: '19px', color: '#1e293b', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+            Material & Zeiterfassung (Material & Time Tracking Input)
+          </h2>
+
+          <form onSubmit={handleSaveEntry}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '6px', color: '#475569' }}>Unternehmen (Business):</label>
+                <select value={selectedBusiness} onChange={(e) => setSelectedBusiness(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13.5px', backgroundColor: '#fff', fontWeight: '500' }}>
+                  <option value="Fürst Hauser Gebäudereinigung">Fürst Hauser Gebäudereinigung</option>
+                  <option value="Bullauge Waschsalon">Bullauge Waschsalon</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '6px', color: '#475569' }}>Mitarbeiter (Employee):</label>
+                {isAdmin ? (
+                  <select value={selectedEmployee} onChange={(e) => setSelectedEmployee(e.target.value)} required style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13.5px', backgroundColor: '#fff' }}>
+                    <option value="">-- Employee List --</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.username}>{emp.username}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input type="text" value={user.username} disabled style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13.5px', backgroundColor: '#f1f5f9', color: '#475569', fontWeight: '500' }} />
+                )}
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '6px', color: '#475569' }}>Datum (Date):</label>
+                <input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} required style={{ width: '100%', padding: '9px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13.5px' }} />
+              </div>
+            </div>
+
+            {/* Shift hours selectors */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', backgroundColor: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '25px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>Arbeitsbeginn (Start Time):</label>
+                <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '14px', backgroundColor: '#fff' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '6px', color: '#334155' }}>Arbeitsende (End Time):</label>
+                <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '14px', backgroundColor: '#fff' }} />
+              </div>
+            </div>
+
+            {/* Material Counter Table List Component */}
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', marginBottom: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 1.2fr', background: '#f8fafc', padding: '12px', borderBottom: '2px solid #e2e8f0', fontWeight: '700', fontSize: '13px', color: '#475569' }}>
+                <div>Material / Artikelbezeichnung [Specification]</div>
+                <div style={{ textAlign: 'center' }}>Bestellung (Ordered Amount)</div>
+                <div style={{ textAlign: 'center' }}>Rücknahme (Returned Amount)</div>
+              </div>
+
+              {materials.map((item, idx) => (
+                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 1.2fr', padding: '12px', borderBottom: '1px solid #f1f5f9', alignItems: 'center', backgroundColor: item.nameDe === 'Sonstiges' ? '#fffbeb' : '#fff' }}>
+                  <div>
+                    <div style={{ fontWeight: '600', fontSize: '14px', color: '#1e293b' }}>
+                      {item.nameDe} <span style={{ fontWeight: '400', color: '#64748b', fontSize: '13px' }}>({item.nameEn})</span>
+                    </div>
+                    {item.specification && (
+                      <span style={{ display: 'inline-block', background: '#f1f5f9', color: '#475569', fontSize: '11px', padding: '2px 6px', borderRadius: '4px', marginTop: '4px', fontWeight: '600' }}>
+                        {item.specification}
+                      </span>
+                    )}
+                    {item.nameDe === 'Sonstiges' && (
+                      <input 
+                        type="text" 
+                        placeholder="Kurze Beschreibung hier eingeben..." 
+                        value={item.description || ''} 
+                        onChange={(e) => handleDescriptionChange(idx, e.target.value)}
+                        style={{ width: '90%', marginTop: '8px', padding: '6px 10px', borderRadius: '4px', border: '1px solid #f59e0b', fontSize: '12.5px', background: '#fff' }}
+                      />
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '15px', fontWeight: '700', color: '#2563eb', minWidth: '25px', textAlign: 'center' }}>{item.ordered}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <button type="button" onClick={() => handleCountChange(idx, 'ordered', 'up')} style={{ padding: '2px 6px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>▲</button>
+                      <button type="button" onClick={() => handleCountChange(idx, 'ordered', 'down')} style={{ padding: '2px 6px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>▼</button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '15px', fontWeight: '700', color: '#16a34a', minWidth: '25px', textAlign: 'center' }}>{item.returned}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <button type="button" onClick={() => handleCountChange(idx, 'returned', 'up')} style={{ padding: '2px 6px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>▲</button>
+                      <button type="button" onClick={() => handleCountChange(idx, 'returned', 'down')} style={{ padding: '2px 6px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '4px', cursor: 'pointer', fontSize: '10px' }}>▼</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button type="submit" style={{ width: '100%', padding: '12px', background: '#22c55e', color: 'white', border: 'none', borderRadius: '6px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>
+              Eintrag speichern (Save Entry)
+            </button>
+          </form>
+        </div>
+
+        {/* RIGHT COLUMN: DYNAMIC WORKSPACE ROUTED BY USER ACCESS ROLE */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+          
+          {/* ==================== ROLE BLOCK A: ADMIN DASHBOARDS ==================== */}
+          {isAdmin && (
+            <>
+              {/* Account Provisioning form */}
+              <div style={{ background: '#ffffff', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+                <h2 style={{ marginTop: 0, marginBottom: '4px', fontSize: '18px', color: '#1e293b' }}>Mitarbeiter anlegen (Create Staff Account)</h2>
+                <p style={{ fontSize: '12.5px', color: '#64748b', marginTop: 0, marginBottom: '15px' }}>Mitarbeiter können eingegebene Stunden im Nachhinein nicht bearbeiten oder löschen.</p>
+                {adminSectionMessage && <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '8px', borderRadius: '6px', marginBottom: '12px', fontSize: '12.5px' }}>{adminSectionMessage}</div>}
+                <form onSubmit={handleCreateEmployee} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <input type="text" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} placeholder="Benutzername (Username)" style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }} />
+                  <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Passwort (Password)" style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }} />
+                  <select value={newRole} onChange={(e) => setNewRole(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: '#fff' }}>
+                    <option value="employee">Mitarbeiter (Employee)</option>
+                    <option value="admin">Administrator (Admin)</option>
+                  </select>
+                  <button type="submit" style={{ padding: '9px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>Konto erstellen</button>
+                </form>
+              </div>
+
+              {/* 📊 ADMIN MASTER MONTHLY ROLLS UP PAYROLL TABLE */}
+              <div style={{ background: '#ffffff', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+                <h2 style={{ marginTop: 0, marginBottom: '5px', fontSize: '18px', color: '#1e293b' }}>🗓️ Mitarbeiter Monatsabrechnung (Staff Monthly Totals)</h2>
+                <p style={{ fontSize: '12.5px', color: '#64748b', marginTop: 0, marginBottom: '15px' }}>Zusammenfassung aller geleisteten Arbeitsstunden sortiert nach Monat und Mitarbeiter.</p>
+                
+                {Object.keys(adminPayrollData).length === 0 ? (
+                  <div style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', padding: '10px' }}>Keine Monatsdaten berechnet.</div>
+                ) : (
+                  Object.keys(adminPayrollData).sort().reverse().map(month => (
+                    <div key={month} style={{ marginBottom: '20px', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                      <div style={{ background: '#0f172a', color: '#fff', padding: '8px 12px', fontSize: '13.5px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Monat: {month}</span>
+                        <span style={{ fontSize: '11px', background: '#334155', padding: '2px 6px', borderRadius: '4px' }}>Abrechnung</span>
+                      </div>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                          <tr style={{ background: '#f8fafc', borderBottom: '1px solid #cbd5e1', textAlign: 'left' }}>
+                            <th style={{ padding: '8px' }}>Mitarbeiter (Staff)</th>
+                            <th style={{ padding: '8px', textAlign: 'right' }}>Gesamtstunden (Total Hours)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.keys(adminPayrollData[month]).map(emp => (
+                            <tr key={emp} style={{ borderBottom: '1px solid #edf2f7' }}>
+                              <td style={{ padding: '8px', fontWeight: '600' }}>👤 {emp}</td>
+                              <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#2563eb' }}>
+                                {adminPayrollData[month][emp]} Std.
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ==================== ROLE BLOCK B: EMPLOYEE PRIVACY DASHBOARDS ==================== */}
+          {!isAdmin && (
+            <div style={{ background: '#ffffff', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
+              <h2 style={{ marginTop: 0, marginBottom: '5px', fontSize: '18px', color: '#1e293b' }}>🗓️ Meine Monatsübersicht (My Monthly Summary)</h2>
+              <p style={{ fontSize: '12.5px', color: '#64748b', marginTop: 0, marginBottom: '15px' }}>Ihre gesamten geleisteten Arbeitsstunden zusammengefasst für jeden Monat.</p>
+              
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                    <th style={{ padding: '10px' }}>Jahr / Monat</th>
+                    <th style={{ padding: '10px', textAlign: 'right' }}>Arbeitsstunden Gesamt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.keys(employeeMonthlySummary).length === 0 ? (
+                    <tr>
+                      <td colSpan={2} style={{ padding: '15px', textAlign: 'center', color: '#94a3b8', fontStyle: 'italic' }}>Noch keine Stunden erfasst.</td>
+                    </tr>
+                  ) : (
+                    Object.keys(employeeMonthlySummary).sort().reverse().map(month => (
+                      <tr key={month} style={{ borderBottom: '1px solid #edf2f7', backgroundColor: '#fdfdfd' }}>
+                        <td style={{ padding: '10px', fontWeight: '600', color: '#1e293b' }}>📅 {month}</td>
+                        <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', color: '#16a34a' }}>{employeeMonthlySummary[month]} Std.</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* DAILY TIMELINE RECORD TRACKING COMPONENT BLOCK */}
+          <div style={{ background: '#ffffff', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', maxHeight: isAdmin ? '55vh' : '85vh', overflowY: 'auto' }}>
+            <h2 style={{ marginTop: 0, marginBottom: '5px', fontSize: '18px', color: '#1e293b' }}>
+              {isAdmin ? 'Eintragungshistorie (Master Tracking Log)' : 'Meine Arbeitsstunden (My Shift Log)'}
+            </h2>
+            <p style={{ fontSize: '12.5px', color: '#64748b', marginTop: 0, marginBottom: '20px' }}>
+              {isAdmin ? 'Verwaltungsübersicht aller täglichen Arbeitszeiten und Materialbestellungen.' : 'Historie Ihrer eingetragenen Stunden und verwendeten Reinigungsmaterialien.'}
+            </p>
+            
+            {displayedEntries.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '13.5px' }}>Keine Schichteinträge erfasst.</div>
             ) : (
-              entries.map(entry => (
-                <tr key={entry.id}>
-                  <td style={{ padding: '10px', border: '1px solid #e5e7eb' }}>{entry.date}</td>
-                  <td style={{ padding: '10px', border: '1px solid #e5e7eb' }}>{entry.employeeName}</td>
-                  <td style={{ padding: '10px', border: '1px solid #e5e7eb', whiteSpace: 'pre-wrap' }}>{entry.orderedAmount}</td>
-                  <td style={{ padding: '10px', border: '1px solid #e5e7eb', whiteSpace: 'pre-wrap' }}>{entry.bringBackAmount}</td>
-                </tr>
-              ))
+              displayedEntries.map((entry: any, eIdx: number) => {
+                const totalHours = calculateHoursDuration(entry.startTime, entry.endTime);
+                
+                // Friendly print layout cleanup for raw API text flags
+                const readableStart = (entry.startTime && !entry.startTime.includes('Not')) ? entry.startTime : '—';
+                const readableEnd = (entry.endTime && !entry.endTime.includes('Not')) ? entry.endTime : '—';
+
+                return (
+                  <div key={eIdx} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '15px', marginBottom: '15px', backgroundColor: '#f8fafc' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '10px', fontSize: '13px', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 'bold', color: '#1e293b' }}>👤 {entry.employeeName}</span>
+                        <span style={{ color: '#475569', fontWeight: '600' }}>🏢 {entry.business}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '12px', marginTop: '2px' }}>
+                        <span>📅 Datum: <strong>{entry.date}</strong></span>
+                        <span style={{ color: '#0f172a' }}>
+                          ⏰ Zeit: <strong>{readableStart}</strong> - <strong>{readableEnd}</strong> 
+                          <span style={{ marginLeft: '6px', background: '#e0f2fe', color: '#0369a1', padding: '2px 5px', borderRadius: '4px', fontWeight: 'bold' }}>
+                            {totalHours} Std.
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Inventory usage listings nested elements loop */}
+                    {isAdmin && (
+                      <div style={{ fontSize: '12.5px' }}>
+                        {Array.isArray(entry.materialsList) && entry.materialsList.length > 0 ? (
+                          entry.materialsList.map((m: any, mIdx: number) => (
+                            <div key={mIdx} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px dashed #edf2f7' }}>
+                              <span>
+                                • {m.nameDe} {m.specification ? `[${m.specification}]` : ''}
+                                {m.description && <em style={{ color: '#b45309', display: 'block', fontSize: '11.5px', marginLeft: '10px' }}>↳ Notiz: "{m.description}"</em>}
+                              </span>
+                              <span style={{ fontWeight: '700' }}>
+                                <span style={{ color: '#2563eb' }}>B: {m.ordered}</span> | <span style={{ color: '#16a34a' }}>R: {m.returned}</span>
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '11.5px' }}>Keine Materialänderungen erfasst.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
-          </tbody>
-        </table>
+          </div>
+
+        </div>
       </div>
     </div>
   );

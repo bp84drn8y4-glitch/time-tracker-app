@@ -1,114 +1,129 @@
 import express from 'express';
 import cors from 'cors';
-import db from './db';
+import sqlite3 from 'sqlite3';
+import path from 'path';
 
 const app = express();
+const PORT = process.env.PORT || 10000;
 
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
+app.use(cors());
 app.use(express.json());
 
-// 🔐 Login Route
+// Initialize Local Database Connection
+const dbPath = path.resolve(__dirname, 'database.sqlite');
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Database connection error:', err.message);
+  } else {
+    console.log('Connected to the standard SQLite database.');
+    initializeTables();
+  }
+});
+
+function initializeTables() {
+  // Setup Users profiles table
+  db.run(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL
+  )`, () => {
+    // Inject default seed admin profile safely
+    db.run(`INSERT OR IGNORE INTO users (username, password, role) VALUES ('admin', 'admin', 'admin')`, () => {
+      console.log('Master admin account initialized successfully.');
+    });
+  });
+
+  // Setup Timesheets logging entries table
+  db.run(`CREATE TABLE IF NOT EXISTS entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employeeName TEXT NOT NULL,
+    business TEXT NOT NULL,
+    date TEXT NOT NULL,
+    startTime TEXT,
+    endTime TEXT,
+    materialsList TEXT
+  )`);
+}
+
+// ROUTE 1: Authentication verification gateway
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
-
   if (!username || !password) {
-    return res.status(400).json({ success: false, error: 'Username and password are required.' });
+    return res.status(400).json({ error: 'Username and password are required.' });
   }
 
-  // Hardcoded Admin fallback
-  if (username.toLowerCase() === 'admin' && password === 'admin') {
-    return res.json({ 
-      success: true, 
-      user: { id: 1, username: 'Admin', role: 'admin' } 
-    });
-  }
-
-  const sql = 'SELECT id, username, role, password FROM users WHERE LOWER(username) = LOWER(?)';
-  db.get(sql, [username], (err, row: any) => {
-    if (err) return res.status(500).json({ success: false, error: err.message });
-    if (!row || row.password !== password) {
-      return res.status(401).json({ success: false, error: 'Invalid username or password.' });
-    }
-    res.json({ 
-      success: true, 
-      user: { id: row.id, username: row.username, role: row.role } 
-    });
-  });
-});
-
-// 👥 NEW ROUTE: Fetch all registered users for the Admin panel
-app.get('/api/users', (req, res) => {
-  const sql = 'SELECT id, username, role FROM users';
-  db.all(sql, [], (err, rows) => {
+  db.get(`SELECT * FROM users WHERE LOWER(username) = LOWER(?) AND password = ?`, [username.trim(), password], (err, row: any) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
+    if (!row) return res.status(401).json({ error: 'Anmeldedaten ungültig (Invalid Credentials)' });
+    
+    res.json({ id: row.id, username: row.username, role: row.role });
   });
 });
 
-// 📝 NEW ROUTE: Register a brand new staff account
+// ROUTE 2: Admin Registration endpoint
 app.post('/api/users/register', (req, res) => {
   const { username, password, role } = req.body;
-
-  if (!username || !password || !role) {
-    return res.status(400).json({ error: 'All fields are required.' });
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Missing registration credentials.' });
   }
 
-  const sql = 'INSERT INTO users (username, password, role) VALUES (?, ?, ?)';
-  db.run(sql, [username, password, role], function(err) {
+  db.run(`INSERT INTO users (username, password, role) VALUES (?, ?, ?)`, [username.trim(), password, role || 'employee'], function(err) {
     if (err) {
       if (err.message.includes('UNIQUE')) {
-        return res.status(400).json({ error: 'Username already exists.' });
+        return res.status(400).json({ message: 'Benutzername existiert bereits.' });
       }
-      return res.status(500).json({ error: err.message });
+      return res.status(500).json({ message: err.message });
     }
-    res.status(201).json({ message: 'User registered successfully!', id: this.lastID });
+    res.json({ id: this.lastID, success: true });
   });
 });
 
-// 📊 UPDATED ROUTE: Fetch log entries (supports filtering for staff vs admin views)
-app.get('/api/entries', (req, res) => {
-  const { employee, role } = req.query;
-  
-  let sql = 'SELECT * FROM entries';
-  const params: any[] = [];
-
-  // Employees can only view their own logs, admins see everything
-  if (role === 'employee' && employee) {
-    sql += ' WHERE employeeName = ?';
-    params.push(employee);
-  }
-  
-  sql += ' ORDER BY id DESC';
-
-  db.all(sql, params, (err, rows) => {
+// ROUTE 3: Dropdown selection compilation loader
+app.get('/api/users', (req, res) => {
+  db.all(`SELECT id, username, role FROM users`, [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
 });
 
-// 📥 Insert a tracking entry
-app.post('/api/entries', (req, res) => {
-  const { employeeName, orderedAmount, bringBackAmount, date } = req.body;
-  if (!employeeName || !date) {
-    return res.status(400).json({ error: 'Employee name and date are required.' });
-  }
-  const sql = `INSERT INTO entries (employeeName, orderedAmount, bringBackAmount, date) VALUES (?, ?, ?, ?)`;
-  db.run(sql, [employeeName, orderedAmount, bringBackAmount, date], function (err) {
+// ROUTE 4: Fetch logged entries list
+app.get('/api/entries', (req, res) => {
+  db.all(`SELECT * FROM entries ORDER BY date DESC, id DESC`, [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.status(201).json({ message: 'Entry saved.', id: this.lastID });
+    
+    // Parse the materials string back to an array safely for frontend
+    const formatted = rows.map((row: any) => ({
+      ...row,
+      materialsList: JSON.parse(row.materialsList || '[]')
+    }));
+    res.json(formatted);
   });
 });
 
-app.get('/', (req, res) => {
-  res.send('Time Tracker API Server is live.');
+// ROUTE 5: Core endpoint handler that securely captures and stores entries
+app.post('/api/entries', (req, res) => {
+  const { employeeName, business, date, startTime, endTime, start, end, materialsList } = req.body;
+
+  // Fallbacks guarantee no missing string variables
+  const finalStart = startTime || start || 'Not logged';
+  const finalEnd = endTime || end || 'Not logged';
+
+  const query = `INSERT INTO entries (employeeName, business, date, startTime, endTime, materialsList) VALUES (?, ?, ?, ?, ?, ?)`;
+  
+  db.run(query, [
+    employeeName,
+    business,
+    date,
+    finalStart,
+    finalEnd,
+    JSON.stringify(materialsList || [])
+  ], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ id: this.lastID, message: 'Entry logged successfully!' });
+  });
 });
 
-const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
