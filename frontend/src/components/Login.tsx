@@ -20,8 +20,8 @@ export function Login({ onLoginSuccess }: LoginProps) {
         body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
-      if (res.ok && data.success) {
-        onLoginSuccess(data.user);
+      if (res.ok) {
+        onLoginSuccess(data);
       } else {
         setError(data.message || 'Anmeldedaten ungültig (Invalid Credentials)');
       }
