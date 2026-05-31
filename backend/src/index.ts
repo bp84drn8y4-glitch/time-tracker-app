@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 // Paste your Supabase connection string link right here
-const connectionString = "postgresql://postgres.wehebqlraxwisowqogtl:[+dvf4t9$q&NmH@@]@aws-0-eu-west-1.pooler.supabase.com:5432/postgres";
+const connectionString = "postgresql://postgres.wehebqlraxwisowqogtl:+dvf4t9$q&NmH@@@aws-0-eu-west-1.pooler.supabase.com:5432/postgres";
 
 const pool = new Pool({
   connectionString: connectionString,
