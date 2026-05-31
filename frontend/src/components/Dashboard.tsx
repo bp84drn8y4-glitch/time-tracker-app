@@ -32,13 +32,14 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
 };
 
 const handleEditEntry = (entry: any) => {
-  setSelectedBusiness(entry.business);
-  setEntryDate(entry.date);
-  setStartTime(entry.startTime);
-  setEndTime(entry.endTime);
-  setSelectedTasks(entry.tasks || []);
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-};
+    setSelectedBusiness(entry.business);
+    setEntryDate(entry.date);
+    setStartTime(entry.startTime);
+    setEndTime(entry.endTime);
+    setSelectedTasks(entry.tasks || []);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // 🏢 Dropdown Context State Fields
   const [selectedBusiness, setSelectedBusiness] = useState('Fürst Hauser Gebäudereinigung');
   const [selectedEmployee, setSelectedEmployee] = useState('');
