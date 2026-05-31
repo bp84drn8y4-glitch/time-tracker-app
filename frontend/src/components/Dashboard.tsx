@@ -26,6 +26,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   // ⏰ Time State Fields
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [selectedTask, setSelectedTask] = useState('');
   
   // 👤 Admin Account Creation State Fields
   const [newUsername, setNewUsername] = useState('');
@@ -37,6 +38,23 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const [entries, setEntries] = useState<any[]>([]);
   const [message, setMessage] = useState('');
   const [adminSectionMessage, setAdminSectionMessage] = useState('');
+
+  // 📋 Task Lists Configurations
+  const TASKS_BY_BUSINESS: Record<string, string[]> = {
+  "Fürst Hauser Gebäudereinigung": [
+    "Außenreinigung Schaufenster und Eingangstüren (Exterior cleaning of shop windows and entrance doors)",
+    "Innenreinigung Schaufenster und Eingangstüren (Interior cleaning of shop windows and entrance doors)",
+    "Beidseitige Reinigung von Glasflächen im Verkaufsbereich (Two-sided cleaning of glass surfaces in the sales area)",
+    "Beidseitige Reinigung von Glasflächen im Mitarbeiterbereich (Two-sided cleaning of glass surfaces in the employee area)",
+    "Zusätzliche Innenreinigung von Schaufenstern zu Dekorationsterminen mit zusätzlicher Anfahrt (Additional interior cleaning of shop windows for decoration appointments with an additional journey)",
+    "Zusätzliche Innenreinigung von Schaufenstern zu Dekorationsterminen in Verbindung mit regelmäßiger Glasreinigung ohne zusätzliche Anfahrt (Additional interior cleaning of shop windows for decoration appointments in connection with regular glass cleaning without an additional journey)",
+    "Reinigung von Spiegeln (Cleaning of mirrors)",
+    "Sonderleistungen 1 (Special services 1)",
+    "Sonderleistungen 2 (Special services 2)",
+    "Sonderleistungen 3 (Special services 3)",
+    "Sonstiges (Other / Miscellaneous)"
+  ]
+};
 
   // 📦 Material Lists Configurations
   const initialFurstHauser: MaterialItem[] = [
@@ -324,6 +342,27 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                 <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '14px', backgroundColor: '#fff' }} />
               </div>
             </div>
+	    
+	    {/* --- Dynamic Task Selection Section --- */}
+{selectedBusiness === "Fürst Hauser Gebäudereinigung" && (
+  <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '25px' }}>
+    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '6px', color: '#475569' }}>
+      Aufgabe wählen (Select Task):
+    </label>
+    <select
+      value={selectedTask}
+      onChange={(e) => setSelectedTask(e.target.value)}
+      style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13.5px', backgroundColor: '#ffffff', color: '#1e293b' }}
+    >
+      <option value="">-- Bitte Aufgabe wählen [Please select a task] --</option>
+      {TASKS_BY_BUSINESS["Fürst Hauser Gebäudereinigung"].map((taskItem, idx) => (
+        <option key={idx} value={taskItem}>
+          {taskItem}
+        </option>
+      ))}
+    </select>
+  </div>
+)}
 
             {/* Material Counter Table List Component */}
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', marginBottom: '20px' }}>
