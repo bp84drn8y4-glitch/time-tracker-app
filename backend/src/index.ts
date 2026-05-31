@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 // Initialize Local Database Connection
-const dbPath = path.resolve(__dirname, 'database.sqlite');
+const dbPath = '/var/data/database.sqlite';
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Database connection error:', err.message);
