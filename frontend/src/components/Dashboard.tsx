@@ -17,7 +17,28 @@ interface MaterialItem {
 export function Dashboard({ user, onLogout }: DashboardProps) {
   const isAdmin = user.role.toLowerCase() === 'admin';
   const API_URL = 'https://time-tracker-app-w8vf.onrender.com/api';
+  const handleDeleteEntry = async (entryId: string | number) => {
+  if (!window.confirm("Möchten Sie diesen Eintrag wirklich löschen? [Delete this entry?]")) return;
+  try {
+    const res = await fetch(`${API_URL}/entries/${entryId}`, { method: 'DELETE' });
+    if (res.ok) {
+      setEntries(prev => prev.filter(e => e.id !== entryId));
+    } else {
+      alert("Fehler beim Löschen [Error deleting entry]");
+    }
+  } catch (err) {
+    console.error("Error deleting entry:", err);
+  }
+};
 
+const handleEditEntry = (entry: any) => {
+  setSelectedBusiness(entry.business);
+  setEntryDate(entry.date);
+  setStartTime(entry.startTime);
+  setEndTime(entry.endTime);
+  setSelectedTasks(entry.tasks || []);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
   // 🏢 Dropdown Context State Fields
   const [selectedBusiness, setSelectedBusiness] = useState('Fürst Hauser Gebäudereinigung');
   const [selectedEmployee, setSelectedEmployee] = useState('');
@@ -26,7 +47,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   // ⏰ Time State Fields
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
-  const [selectedTask, setSelectedTask] = useState('');
+  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   
   // 👤 Admin Account Creation State Fields
   const [newUsername, setNewUsername] = useState('');
@@ -343,27 +364,36 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
               </div>
             </div>
 	    
-	    {/* --- Dynamic Task Selection Section --- */}
+{/* --- Dynamic Task Selection Section via Checkboxes --- */}
 {selectedBusiness === "Fürst Hauser Gebäudereinigung" && (
   <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '25px' }}>
-    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '6px', color: '#475569' }}>
-      Aufgabe wählen (Select Task):
+    <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '10px', color: '#475569' }}>
+      Aufgaben wählen (Select Tasks):
     </label>
-    <select
-      value={selectedTask}
-      onChange={(e) => setSelectedTask(e.target.value)}
-      style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13.5px', backgroundColor: '#ffffff', color: '#1e293b' }}
-    >
-      <option value="">-- Bitte Aufgabe wählen [Please select a task] --</option>
-      {TASKS_BY_BUSINESS["Fürst Hauser Gebäudereinigung"].map((taskItem, idx) => (
-        <option key={idx} value={taskItem}>
-          {taskItem}
-        </option>
-      ))}
-    </select>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {TASKS_BY_BUSINESS["Fürst Hauser Gebäudereinigung"].map((taskItem, idx) => {
+        const isChecked = selectedTasks.includes(taskItem);
+        return (
+          <label key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px', color: '#1e293b', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={isChecked}
+              onChange={() => {
+                if (isChecked) {
+                  setSelectedTasks(selectedTasks.filter(t => t !== taskItem));
+                } else {
+                  setSelectedTasks([...selectedTasks, taskItem]);
+                }
+              }}
+              style={{ marginTop: '3px', cursor: 'pointer' }}
+            />
+            <span>{taskItem}</span>
+          </label>
+        );
+      })}
+    </div>
   </div>
 )}
-
             {/* Material Counter Table List Component */}
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', marginBottom: '20px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 1.2fr', background: '#f8fafc', padding: '12px', borderBottom: '2px solid #e2e8f0', fontWeight: '700', fontSize: '13px', color: '#475569' }}>
@@ -546,8 +576,37 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                           </span>
                         </span>
                       </div>
-                    </div>
-                    
+</div>
+{/* Task display block */}
+<div style={{ fontSize: '12px', color: '#64748b', marginTop: '6px', borderTop: '1px dashed #e2e8f0', paddingTop: '6px' }}>
+  <strong>Aufgaben (Tasks):</strong>{' '}
+  {entry.tasks && entry.tasks.length > 0 ? (
+    <ul style={{ margin: '4px 0 0 15px', padding: 0, listStyleType: 'disc' }}>
+      {entry.tasks.map((t: string, tIdx: number) => (
+        <li key={tIdx} style={{ color: '#1e293b', marginBottom: '2px' }}>{t}</li>
+      ))}
+    </ul>
+  ) : (
+    <span style={{ fontStyle: 'italic' }}>Keine Aufgaben angegeben [No tasks specified]</span>
+  )}
+</div>
+      {/* Admin Actions Panel */}
+{isAdmin && (
+  <div style={{ display: 'flex', gap: '10px', marginTop: '12px', paddingTop: '8px', borderTop: '1px dashed #e2e8f0', justifyContent: 'flex-end' }}>
+    <button
+      onClick={() => handleEditEntry(entry)}
+      style={{ padding: '5px 12px', backgroundColor: '#3b82f6', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+    >
+      Bearbeiten (Edit)
+    </button>
+    <button
+      onClick={() => handleDeleteEntry(entry.id)}
+      style={{ padding: '5px 12px', backgroundColor: '#ef4444', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+    >
+      Löschen (Delete)
+    </button>
+  </div>
+)}              
                     {/* Inventory usage listings nested elements loop */}
                     {isAdmin && (
                       <div style={{ fontSize: '12.5px' }}>
