@@ -18,17 +18,23 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const isAdmin = user.role.toLowerCase() === 'admin';
   const API_URL = 'https://time-tracker-app-w8vf.onrender.com/api';
   const handleDeleteEntry = async (entryId: string | number) => {
-  if (!window.confirm("Möchten Sie diesen Eintrag wirklich löschen? [Delete this entry?]")) return;
-  try {
-    const res = await fetch(`${API_URL}/entries/${entryId}`, { method: 'DELETE' });
-    if (res.ok) {
-      setEntries(prev => prev.filter(e => e.id !== entryId));
-    } else {
-      alert("Fehler beim Löschen [Error deleting entry]");
+    if (!window.confirm("Möchten Sie diesen Eintrag wirklich löschen? [Delete this entry?]")) return;
+    try {
+      const res = await fetch(`${API_URL}/entries/${entryId}`, { 
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (res.ok) {
+        // This ensures the deleted item disappears instantly from the screen view list
+        setEntries(prev => prev.filter(e => e.id !== entryId && e._id !== entryId));
+      } else {
+        alert("Fehler beim Löschen [Error deleting entry]");
+      }
+    } catch (err) {
+      console.error("Error deleting entry:", err);
     }
-  } catch (err) {
-    console.error("Error deleting entry:", err);
-  }
+  };
 };
 
 const handleEditEntry = (entry: any) => {
@@ -597,7 +603,7 @@ const handleEditEntry = (entry: any) => {
 {isAdmin && (
   <div style={{ display: 'flex', gap: '10px', marginTop: '12px', paddingTop: '8px', borderTop: '1px dashed #e2e8f0', justifyContent: 'flex-end' }}>
     <button
-      onClick={() => handleEditEntry(entry)}
+      onClick={() => handleDeleteEntry(entry.id || entry._id)}
       style={{ padding: '5px 12px', backgroundColor: '#3b82f6', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
     >
       Bearbeiten (Edit)
