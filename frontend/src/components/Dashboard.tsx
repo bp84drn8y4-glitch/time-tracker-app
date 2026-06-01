@@ -148,22 +148,32 @@ const handleEditEntry = (entry: any) => {
 
   // 🧮 Fixed Helper Function: Correctly handles blank values or text status flags sent by database
   const calculateHoursDuration = (start: string, end: string): number => {
-    if (!start || !end || start.includes('Not') || end.includes('Not') || start === '—' || end === '—') return 0;
-    
-    try {
-      const [startH, startM] = start.split(':').map(Number);
-      const [endH, endM] = end.split(':').map(Number);
+  if (!start || !end || start.includes('Not') || end.includes('Not') || start === '-' || end === '-') return 0;
+  
+  try {
+    const parseTimeTo24h = (timeStr: string) => {
+      const [time, modifier] = timeStr.trim().split(' ');
+      let [hours, minutes] = time.split(':').map(Number);
       
-      if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return 0;
+      if (modifier === 'PM' && hours < 12) hours += 12;
+      if (modifier === 'AM' && hours === 12) hours = 0;
+      
+      return { hours, minutes };
+    };
 
-      let diffMinutes = (endH * 60 + endM) - (startH * 60 + startM);
-      if (diffMinutes < 0) diffMinutes += 24 * 60; // Handles overnight late shifts seamlessly
-      
-      return parseFloat((diffMinutes / 60).toFixed(2));
-    } catch (e) {
-      return 0;
-    }
-  };
+    const startTimeObj = parseTimeTo24h(start);
+    const endTimeObj = parseTimeTo24h(end);
+
+    if (isNaN(startTimeObj.hours) || isNaN(endTimeObj.hours)) return 0;
+
+    let diffMinutes = (endTimeObj.hours * 60 + endTimeObj.minutes) - (startTimeObj.hours * 60 + startTimeObj.minutes);
+    if (diffMinutes < 0) diffMinutes += 24 * 60; // Handles overnight shifts
+
+    return parseFloat((diffMinutes / 60).toFixed(2));
+  } catch (e) {
+    return 0;
+  }
+};
 
   // 🗓️ Helper Function: Dynamic case-insensitive rolling accumulator
   const getMonthlyRollup = (userEntries: any[]) => {
@@ -178,9 +188,12 @@ const handleEditEntry = (entry: any) => {
   };
 
   // 🔒 Fixed Data Filtration: Converts names to lowercase to bypass capitalization matching bugs
-  const displayedEntries = isAdmin 
-    ? entries 
-    : entries.filter(e => e.employeeName && user.username && e.employeeName.toLowerCase().trim() === user.username.toLowerCase().trim());
+  const displayedEntries = isAdmin
+  ? entries
+  : entries.filter(e => {
+      const empName = e.employeeName || e.employeename;
+      return empName && user.username && empName.toLowerCase().trim() === user.username.toLowerCase().trim();
+    });
 
   const employeeMonthlySummary = getMonthlyRollup(displayedEntries);
 
