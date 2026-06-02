@@ -613,7 +613,6 @@ const handleEditEntry = (entry: any) => {
     <span style={{ fontStyle: 'italic' }}>Keine Aufgaben angegeben [No tasks specified]</span>
   )}
 </div>
-
       {/* Admin Actions Panel */}
 {isAdmin && (
   <div style={{ display: 'flex', gap: '10px', marginTop: '12px', paddingTop: '8px', borderTop: '1px dashed #e2e8f0', justifyContent: 'flex-end' }}>
