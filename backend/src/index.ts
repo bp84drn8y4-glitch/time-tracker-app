@@ -3,98 +3,17 @@ import cors from 'cors';
 import { Pool } from 'pg';
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
 
-// Paste your Supabase connection string link right here
-const connectionString = "postgresql://postgres.wehebqlraxwisowqogtl:+dvf4t9$q&NmH@@@aws-0-eu-west-1.pooler.supabase.com:5432/postgres";
-
 const pool = new Pool({
-  connectionString: connectionString,
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
-async function initializeTables() {
-  try {
-    // Create Users Table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        role TEXT NOT NULL
-      );
-    `);
-
-    // Create Admin User if missing
-    await pool.query(`
-      INSERT INTO users (username, password, role) 
-      VALUES ('admin', 'admin', 'admin') 
-      ON CONFLICT (username) DO NOTHING;
-    `);
-
-    // Create Entries Table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS entries (
-        id SERIAL PRIMARY KEY,
-        employee_name TEXT NOT NULL,
-        business TEXT NOT NULL,
-        date TEXT NOT NULL,
-        start_time TEXT,
-        end_time TEXT,
-        customer TEXT,
-        task TEXT,
-        materials_list TEXT
-      );
-    `);
-    
-    console.log('Connected safely to Supabase Cloud Database and verified tables.');
-  } catch (err: any) {
-    console.error('Database initialization error:', err.message);
-  }
-}
-
-initializeTables();
-
-app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
-  try {
-    const result = await pool.query(
-      'SELECT * FROM users WHERE LOWER(username) = LOWER($1) AND password = $2',
-      [username.trim(), password]
-    );
-    if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid Credentials' });
-    const row = result.rows[0];
-    res.json({ id: row.id, username: row.username, role: row.role });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/users/register', async (req, res) => {
-  const { username, password, role } = req.body;
-  try {
-    const result = await pool.query(
-      'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id',
-      [username.trim(), password, role || 'employee']
-    );
-    res.json({ id: result.rows[0].id, success: true });
-  } catch (err: any) {
-    if (err.message.includes('unique')) return res.status(400).json({ message: 'Benutzername existiert bereits.' });
-    res.status(500).json({ message: err.message });
-  }
-});
-
-app.get('/api/users', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT id, username, role FROM users');
-    res.json(result.rows);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+// 1. GET ALL ENTRIES
 app.get('/api/entries', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM entries ORDER BY date DESC, id DESC');
@@ -113,7 +32,13 @@ app.get('/api/entries', async (req, res) => {
           return row.task ? [row.task] : [];
         }
       })(),
-      materialsList: JSON.parse(row.materials_list || '[]')
+      materialsList: (() => {
+        try {
+          return JSON.parse(row.materials_list || '[]');
+        } catch (e) {
+          return [];
+        }
+      })()
     }));
     res.json(formatted);
   } catch (err: any) {
@@ -121,6 +46,7 @@ app.get('/api/entries', async (req, res) => {
   }
 });
 
+// 2. POST NEW ENTRY
 app.post('/api/entries', async (req, res) => {
   const { employeeName, business, date, startTime, endTime, customer, tasks, materialsList } = req.body;
   try {
@@ -134,7 +60,7 @@ app.post('/api/entries', async (req, res) => {
         startTime || '-',
         endTime || '-',
         customer || 'Allgemein',
-        JSON.stringify(tasks || []), // Correctly saves your actual tasks without fallback text strings!
+        JSON.stringify(tasks || []), 
         JSON.stringify(materialsList || [])
       ]
     );
@@ -144,18 +70,18 @@ app.post('/api/entries', async (req, res) => {
   }
 });
 
-// Move your DELETE endpoint right here (ABOVE app.listen)
+// 3. DELETE ENTRY (Registered before listen!)
 app.delete('/api/entries/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await pool.query('DELETE FROM entries WHERE id = $1', [id]);
+    await pool.query('DELETE FROM entries WHERE id = $1', [id]);
     res.json({ message: 'Entry deleted successfully!' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// App listen should always be the absolute final thing in your file
+// 4. START SERVER
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

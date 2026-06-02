@@ -18,23 +18,23 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const isAdmin = user.role.toLowerCase() === 'admin';
   const API_URL = 'https://time-tracker-app-w8vf.onrender.com/api';
   const handleDeleteEntry = async (entryId: string | number) => {
-    if (!window.confirm("Möchten Sie diesen Eintrag wirklich löschen? [Delete this entry?]")) return;
-    try {
-      const res = await fetch(`${API_URL}/entries/${entryId}`, { 
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      if (res.ok) {
-        // This ensures the deleted item disappears instantly from the screen view list
-	setEntries(prev => prev.filter(e => String(e.id) !== String(entryId)));
-      } else {
-        alert("Fehler beim Löschen [Error deleting entry]");
-      }
-    } catch (err) {
-      console.error("Error deleting entry:", err);
+  if (!window.confirm("Möchten Sie diesen Eintrag wirklich löschen? [Delete this entry?]")) return;
+  try {
+    const res = await fetch(`${API_URL}/entries/${entryId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (res.ok) {
+      // Force both types to strings so comparison never mismatches
+      setEntries(prev => prev.filter(e => String(e.id) !== String(entryId)));
+    } else {
+      alert("Fehler beim Löschen [Error deleting entry]");
     }
-  };
+  } catch (err) {
+    console.error("Error deleting entry:", err);
+  }
+};
 };
 
 const handleEditEntry = (entry: any) => {
