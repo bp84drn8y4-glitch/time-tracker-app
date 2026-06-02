@@ -282,7 +282,7 @@ useEffect(() => {
             </label>
             <select 
               value={customerName || ''} 
-              onChange={(e) => setCustomerName?.(e.target.value)} 
+              onChange={(e) => setCustomerName(e.target.value)} 
               style={{ width: '100%', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', backgroundColor: '#fff' }}
             >
               <option value="">-- Kunde auswählen (Select Customer) --</option>
