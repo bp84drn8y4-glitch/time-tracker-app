@@ -134,7 +134,7 @@ app.post('/api/entries', async (req, res) => {
         startTime || '-',
         endTime || '-',
         customer || 'Allgemein',
-        JSON.stringify(tasks || []), // Saves your selected tasks array safely as text
+        JSON.stringify(tasks || []), // Correctly saves your actual tasks without fallback text strings!
         JSON.stringify(materialsList || [])
       ]
     );
@@ -144,10 +144,7 @@ app.post('/api/entries', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
+// Move your DELETE endpoint right here (ABOVE app.listen)
 app.delete('/api/entries/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -156,4 +153,9 @@ app.delete('/api/entries/:id', async (req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// App listen should always be the absolute final thing in your file
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
