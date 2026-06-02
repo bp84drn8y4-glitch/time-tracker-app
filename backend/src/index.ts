@@ -55,10 +55,26 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// 1. GET ALL ENTRIES
+// 1. GET ENTRIES (Filtered by Role)
 app.get('/api/entries', async (req, res) => {
+  // Get the username and role sent from the frontend headers
+  const username = req.headers['x-user-username'] as string;
+  const role = req.headers['x-user-role'] as string;
+
   try {
-    const result = await pool.query('SELECT * FROM entries ORDER BY date DESC, id DESC');
+    let result;
+    
+    if (role === 'admin') {
+      // Admins see everything
+      result = await pool.query('SELECT * FROM entries ORDER BY date DESC, id DESC');
+    } else {
+      // Employees ONLY see rows matching their username
+      result = await pool.query(
+        'SELECT * FROM entries WHERE LOWER(employee_name) = LOWER($1) ORDER BY date DESC, id DESC',
+        [username]
+      );
+    }
+
     const formatted = result.rows.map((row: any) => ({
       id: row.id,
       employeeName: row.employee_name,
@@ -68,23 +84,20 @@ app.get('/api/entries', async (req, res) => {
       endTime: row.end_time,
       customer: row.customer,
       tasks: (() => {
-        try {
-          return JSON.parse(row.task || '[]');
-        } catch (e) {
-          return row.task ? [row.task] : [];
-        }
+        try { return JSON.parse(row.task || '[]'); } 
+        catch (e) { return row.task ? [row.task] : []; }
       })(),
       materialsList: (() => {
-        try {
-          return JSON.parse(row.materials_list || '[]');
-        } catch (e) {
-          return [];
-        }
-      })()
+        try { return JSON.parse(row.materials_list || '[]'); } 
+        catch (e) { return []; }
+      })(),
+      miscellaneous: row.miscellaneous
     }));
+
     res.json(formatted);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    console.error("Error fetching entries:", error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -114,6 +127,7 @@ app.post('/api/entries', async (req, res) => {
 
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
+
   try {
     if (username === 'admin' && password === 'admin') {
       return res.json({ username: 'admin', role: 'admin' });
