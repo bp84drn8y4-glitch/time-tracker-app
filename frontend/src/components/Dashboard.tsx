@@ -13,7 +13,7 @@ interface Entry {
   date: string;
   startTime: string;
   endTime: string;
-  task?: string;
+  tasks?: string[]; // Updated to handle multiple tasks
   materialsList: Material[];
   miscellaneous?: string;
 }
@@ -76,7 +76,10 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const [date, setDate] = useState('2026-06-02');
   const [startTime, setStartTime] = useState('12:30');
   const [endTime, setEndTime] = useState('12:30');
-  const [selectedTask, setSelectedTask] = useState('');
+  
+  // State changed to an array to hold multiple selected tasks
+  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
+  const [isTaskDropdownOpen, setIsTaskDropdownOpen] = useState(false);
   
   const [materials, setMaterials] = useState<Material[]>(() => 
     FUERST_HAUSER_MATERIALS.map(m => ({ ...m }))
@@ -93,10 +96,10 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   useEffect(() => {
     if (business === 'Bullaude Waschsalon') {
       setMaterials(BULLAUDE_WASCHSALON_MATERIALS.map(m => ({ ...m })));
-      setSelectedTask(''); // Clear task since Waschsalon doesn't use this task list
+      setSelectedTasks([]); 
+      setIsTaskDropdownOpen(false);
     } else {
       setMaterials(FUERST_HAUSER_MATERIALS.map(m => ({ ...m })));
-      setSelectedTask(FUERST_HAUSER_TASKS[0]); // Default to first task
     }
   }, [business]);
 
@@ -122,6 +125,15 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
     setMaterials(updated);
   };
 
+  // Toggle individual task selection on/off
+  const handleTaskToggle = (task: string) => {
+    if (selectedTasks.includes(task)) {
+      setSelectedTasks(selectedTasks.filter(t => t !== task));
+    } else {
+      setSelectedTasks([...selectedTasks, task]);
+    }
+  };
+
   const handleSaveEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     const payload = {
@@ -130,7 +142,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       date,
       startTime,
       endTime,
-      task: business === 'Fürst Hauser Gebäudereinigung' ? selectedTask : undefined,
+      // Map tasks to payload if business matches
+      tasks: business === 'Fürst Hauser Gebäudereinigung' ? selectedTasks : [],
       miscellaneous,
       materialsList: materials.filter(m => m.ordered > 0 || m.returned > 0)
     };
@@ -143,6 +156,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       });
       if (res.ok) {
         setMessage('Eintrag erfolgreich gespeichert!');
+        setSelectedTasks([]);
         if (business === 'Bullaude Waschsalon') {
           setMaterials(BULLAUDE_WASCHSALON_MATERIALS.map(m => ({ ...m })));
         } else {
@@ -272,15 +286,63 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                 </div>
               </div>
 
-              {/* DYNAMIC TASK SELECTION - Only appears for Fürst Hauser */}
+              {/* DYNAMIC MULTI-SELECT TASK DROPDOWN PANEL */}
               {business === 'Fürst Hauser Gebäudereinigung' && (
-                <div style={{ marginBottom: '28px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px', color: '#334155' }}>Aufgabe / Tätigkeit (Task Selection):</label>
-                  <select value={selectedTask} onChange={(e) => setSelectedTask(e.target.value)} style={{ width: '100%', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', backgroundColor: '#ffffff', color: '#0f172a' }}>
-                    {FUERST_HAUSER_TASKS.map((task, tIdx) => (
-                      <option key={tIdx} value={task}>{task}</option>
-                    ))}
-                  </select>
+                <div style={{ marginBottom: '28px', position: 'relative' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px', color: '#334155' }}>
+                    Aufgaben / Tätigkeiten (Select One or More Tasks):
+                  </label>
+                  
+                  {/* Custom Toggle Dropdown Bar */}
+                  <div 
+                    onClick={() => setIsTaskDropdownOpen(!isTaskDropdownOpen)}
+                    style={{ width: '100%', padding: '12px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', backgroundColor: '#ffffff', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}
+                  >
+                    <span style={{ color: selectedTasks.length === 0 ? '#94a3b8' : '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '90%' }}>
+                      {selectedTasks.length === 0 
+                        ? '-- Aufgaben auswählen --' 
+                        : `${selectedTasks.length} Aufgabe(n) ausgewählt`}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>{isTaskDropdownOpen ? '▲' : '▼'}</span>
+                  </div>
+
+                  {/* Multi-Select Panel Menu Popup */}
+                  {isTaskDropdownOpen && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', marginTop: '4px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', zIndex: 50, maxHeight: '280px', overflowY: 'auto', padding: '6px' }}>
+                      {FUERST_HAUSER_TASKS.map((task, tIdx) => {
+                        const isChecked = selectedTasks.includes(task);
+                        return (
+                          <div 
+                            key={tIdx} 
+                            onClick={() => handleTaskToggle(task)}
+                            style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px', borderRadius: '6px', cursor: 'pointer', backgroundColor: isChecked ? '#f0fdf4' : 'transparent', borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.2s' }}
+                          >
+                            <input 
+                              type="checkbox" 
+                              checked={isChecked}
+                              onChange={() => {}} // Controlled via parent div onClick
+                              style={{ marginTop: '3px', cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '13.5px', color: isChecked ? '#166534' : '#334155', fontWeight: isChecked ? '600' : '400', lineHeight: '1.4' }}>
+                              {task}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Visual Selected Badges Layout Feed */}
+                  {selectedTasks.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
+                      {selectedTasks.map((task, index) => (
+                        <div key={index} style={{ backgroundColor: '#e0f2fe', border: '1px solid #bae6fd', color: '#0369a1', fontSize: '12px', padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500' }}>
+                          <span style={{ maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.split(' (')[0]}</span>
+                          <button type="button" onClick={() => handleTaskToggle(task)} style={{ border: 'none', background: 'transparent', color: '#0369a1', cursor: 'pointer', fontWeight: 'bold', padding: 0, fontSize: '12px' }}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -412,10 +474,15 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                           <span>⏰ Zeit: <strong>{entry.startTime} - {entry.endTime}</strong> <span style={{ marginLeft: '6px', color: '#2563eb', fontWeight: '800' }}>{shiftHours.toFixed(1)} Std.</span></span>
                         </div>
 
-                        {/* DISPLAY SAVED TASK LOGS */}
-                        {entry.task && (
-                          <div style={{ fontSize: '13px', color: '#0f172a', fontWeight: '600', marginBottom: '12px', backgroundColor: '#e0f2fe', padding: '6px 12px', borderRadius: '6px', border: '1px solid #bae6fd' }}>
-                            🛠️ Aufgabe: <em>{entry.task}</em>
+                        {/* RENDER MULTIPLE SAVED TASKS FOR SHIFT HISTORY */}
+                        {entry.tasks && entry.tasks.length > 0 && (
+                          <div style={{ fontSize: '13px', color: '#0f172a', marginBottom: '12px', backgroundColor: '#e0f2fe', padding: '8px 12px', borderRadius: '6px', border: '1px solid #bae6fd' }}>
+                            <div style={{ fontWeight: '700', marginBottom: '4px' }}>🛠️ Ausgeführte Aufgaben:</div>
+                            <ul style={{ margin: 0, paddingLeft: '16px', listStyleType: 'circle' }}>
+                              {entry.tasks.map((tsk, tskIdx) => (
+                                <li key={tskIdx} style={{ fontSize: '12.5px', marginBottom: '2px' }}>{tsk}</li>
+                              ))}
+                            </ul>
                           </div>
                         )}
 
