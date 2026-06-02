@@ -13,6 +13,7 @@ interface Entry {
   date: string;
   startTime: string;
   endTime: string;
+  task?: string;
   materialsList: Material[];
   miscellaneous?: string;
 }
@@ -25,7 +26,7 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
-// 1. Core Material List for Fürst Hauser Gebäudereinigung
+// Fürst Hauser Inventory List
 const FUERST_HAUSER_MATERIALS = [
   { name: "Müllbeutel Groß (Large trash bags) 120 L", ordered: 0, returned: 0 },
   { name: "Müllbeutel Medium (Medium trash bags) 60 L", ordered: 0, returned: 0 },
@@ -45,13 +46,26 @@ const FUERST_HAUSER_MATERIALS = [
   { name: "Handseife (Hand soap) 10 Liter", ordered: 0, returned: 0 }
 ];
 
-// 2. Specific Material List for Bullaude Waschsalon (with bilingual translations)
+// Bullaude Waschsalon Inventory List
 const BULLAUDE_WASCHSALON_MATERIALS = [
   { name: "Handfolien (Plastic stretch wrap / gloves)", ordered: 0, returned: 0 },
   { name: "Bügelstärke (Ironing starch / spray starch)", ordered: 0, returned: 0 },
   { name: "Chlor (Chlorine / Bleach)", ordered: 0, returned: 0 },
   { name: "Waschpulver (Washing powder) 20 kg", ordered: 0, returned: 0 },
   { name: "Weichspüler (Fabric softener) 20 L", ordered: 0, returned: 0 }
+];
+
+// Fürst Hauser Specific Task List
+const FUERST_HAUSER_TASKS = [
+  "Außenreinigung Schaufenster und Eingangstüren (Exterior cleaning of shop windows and entrance doors)",
+  "Innenreinigung Schaufenster und Eingangstüren (Interior cleaning of shop windows and entrance doors)",
+  "Beidseitige Reinigung von Glasflächen im Verkaufsbereich (Two-sided cleaning of glass surfaces in the sales area)",
+  "Beidseitige Reinigung von Glasflächen im Mitarbeiterbereich (Two-sided cleaning of glass surfaces in the employee area)",
+  "Zusätzliche Innenreinigung von Schaufenstern zu Dekorationsterminen mit zusätzlicher Anfahrt (Additional interior cleaning of shop windows for decoration appointments with an additional journey)",
+  "Zusätzliche Innenreinigung von Schaufenstern zu Dekorationsterminen in Verbindung mit regelmäßiger Glasreinigung ohne zusätzliche Anfahrt (Additional interior cleaning of shop windows for decoration appointments in connection with regular glass cleaning without an additional journey)",
+  "Reinigung von Spiegeln (Cleaning of mirrors)",
+  "Sonderleistungen",
+  "Sonstiges (Other / Miscellaneous)"
 ];
 
 export function Dashboard({ user, onLogout }: DashboardProps) {
@@ -62,8 +76,8 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const [date, setDate] = useState('2026-06-02');
   const [startTime, setStartTime] = useState('12:30');
   const [endTime, setEndTime] = useState('12:30');
+  const [selectedTask, setSelectedTask] = useState('');
   
-  // Set initial state from Fürst Hauser
   const [materials, setMaterials] = useState<Material[]>(() => 
     FUERST_HAUSER_MATERIALS.map(m => ({ ...m }))
   );
@@ -75,12 +89,14 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState('employee');
 
-  // Dynamically swap materials array whenever selected business switches
+  // Handle automatic switches when the business selection changes
   useEffect(() => {
     if (business === 'Bullaude Waschsalon') {
       setMaterials(BULLAUDE_WASCHSALON_MATERIALS.map(m => ({ ...m })));
+      setSelectedTask(''); // Clear task since Waschsalon doesn't use this task list
     } else {
       setMaterials(FUERST_HAUSER_MATERIALS.map(m => ({ ...m })));
+      setSelectedTask(FUERST_HAUSER_TASKS[0]); // Default to first task
     }
   }, [business]);
 
@@ -114,6 +130,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       date,
       startTime,
       endTime,
+      task: business === 'Fürst Hauser Gebäudereinigung' ? selectedTask : undefined,
       miscellaneous,
       materialsList: materials.filter(m => m.ordered > 0 || m.returned > 0)
     };
@@ -126,7 +143,6 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       });
       if (res.ok) {
         setMessage('Eintrag erfolgreich gespeichert!');
-        // Reset back to empty instances of the current list layout
         if (business === 'Bullaude Waschsalon') {
           setMaterials(BULLAUDE_WASCHSALON_MATERIALS.map(m => ({ ...m })));
         } else {
@@ -153,11 +169,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       const res = await fetch('https://time-tracker-app-w8vf.onrender.com/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: newUsername,
-          password: newPassword,
-          role: newRole
-        })
+        body: JSON.stringify({ username: newUsername, password: newPassword, role: newRole })
       });
 
       if (res.ok) {
@@ -214,7 +226,6 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
           </div>
         )}
 
-        {/* Form Grid Layout Split */}
         <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '32px', alignItems: 'start' }}>
           
           {/* LEFT INPUT FORM MODULE */}
@@ -250,7 +261,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '28px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px', color: '#334155' }}>Arbeitsbeginn (Start Time):</label>
                   <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} style={{ width: '100%', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px' }} />
@@ -260,6 +271,18 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                   <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} style={{ width: '100%', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px' }} />
                 </div>
               </div>
+
+              {/* DYNAMIC TASK SELECTION - Only appears for Fürst Hauser */}
+              {business === 'Fürst Hauser Gebäudereinigung' && (
+                <div style={{ marginBottom: '28px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px', color: '#334155' }}>Aufgabe / Tätigkeit (Task Selection):</label>
+                  <select value={selectedTask} onChange={(e) => setSelectedTask(e.target.value)} style={{ width: '100%', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', backgroundColor: '#ffffff', color: '#0f172a' }}>
+                    {FUERST_HAUSER_TASKS.map((task, tIdx) => (
+                      <option key={tIdx} value={task}>{task}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Dynamic Sub-Table Content Row Counters */}
               <div style={{ marginBottom: '24px' }}>
@@ -276,7 +299,6 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                       <tr key={m.name} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '12px 0', color: '#334155', fontWeight: '500' }}>{m.name}</td>
                         
-                        {/* Ordered Inline Counter Selector Buttons */}
                         <td style={{ textAlign: 'center' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                             <button type="button" onClick={() => handleMaterialChange(idx, 'ordered', m.ordered - 1)} style={{ width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #cbd5e1', backgroundColor: '#f1f5f9', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>-</button>
@@ -285,7 +307,6 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                           </div>
                         </td>
 
-                        {/* Returned Inline Counter Selector Buttons */}
                         <td style={{ textAlign: 'center' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                             <button type="button" onClick={() => handleMaterialChange(idx, 'returned', m.returned - 1)} style={{ width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #cbd5e1', backgroundColor: '#f1f5f9', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>-</button>
@@ -386,10 +407,17 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
                           <span style={{ fontWeight: '700', color: '#1e293b', fontSize: '15px' }}>👤 {entry.employeeName}</span>
                           <span style={{ color: '#475569', fontSize: '13px', fontWeight: '600', backgroundColor: '#e2e8f0', padding: '4px 10px', borderRadius: '6px' }}>🏢 {entry.business}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>
                           <span>📅 Datum: <strong>{entry.date}</strong></span>
                           <span>⏰ Zeit: <strong>{entry.startTime} - {entry.endTime}</strong> <span style={{ marginLeft: '6px', color: '#2563eb', fontWeight: '800' }}>{shiftHours.toFixed(1)} Std.</span></span>
                         </div>
+
+                        {/* DISPLAY SAVED TASK LOGS */}
+                        {entry.task && (
+                          <div style={{ fontSize: '13px', color: '#0f172a', fontWeight: '600', marginBottom: '12px', backgroundColor: '#e0f2fe', padding: '6px 12px', borderRadius: '6px', border: '1px solid #bae6fd' }}>
+                            🛠️ Aufgabe: <em>{entry.task}</em>
+                          </div>
+                        )}
 
                         {entry.materialsList && entry.materialsList.length > 0 && (
                           <div style={{ fontSize: '13px', borderTop: '1px solid #e2e8f0', paddingTop: '10px', color: '#334155' }}>
