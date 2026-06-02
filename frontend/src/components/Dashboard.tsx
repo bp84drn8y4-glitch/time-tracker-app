@@ -366,6 +366,19 @@ useEffect(() => {
               )}
 
               {/* Dynamic Sub-Table Content Row Counters */}
+		<details style={{ width: '100%', marginBottom: '24px' }}>
+  <summary style={{
+    padding: '12px 16px',
+    backgroundColor: '#f1f5f9',
+    borderRadius: '8px',
+    fontWeight: '700',
+    color: '#1e293b',
+    border: '1px solid #cbd5e1',
+    cursor: 'pointer',
+    outline: 'none'
+  }}>
+    Materialliste anzeigen / ausblenden (Show/Hide Material List)
+  </summary>
               <div style={{ marginBottom: '24px' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                   <thead>
@@ -400,7 +413,7 @@ useEffect(() => {
                   </tbody>
                 </table>
               </div>
-
+		</details>
               {/* Sonstiges Textfield Module */}
               <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: '700', color: '#b45309', marginBottom: '8px' }}>Sonstiges (Miscellaneous)</label>
