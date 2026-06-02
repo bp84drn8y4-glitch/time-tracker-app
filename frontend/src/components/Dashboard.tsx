@@ -86,7 +86,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
 
   const fetchEntries = async () => {
     try {
-      const res = await fetch('https://time-tracker-app-w8vf.onrender.com/api/entries');
+      const res = await fetch('https://time-tracker-app-w8vf.onrender.com/model/entries');
       if (res.ok) {
         const data = await res.json();
         setEntries(data);

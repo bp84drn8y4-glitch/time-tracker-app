@@ -16,7 +16,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
 
     try {
       // 🌐 Connecting directly to your verified clean Render backend instance
-      const res = await fetch('https://time-tracker-app-w8vf.onrender.com/login', {
+      const res = await fetch('https://time-tracker-app-w8vf.onrender.com/model/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
