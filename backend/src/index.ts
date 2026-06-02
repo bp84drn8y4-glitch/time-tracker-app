@@ -13,6 +13,13 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+// Schema Alter Patch for PostgreSQL
+pool.query(`
+  ALTER TABLE entries ADD COLUMN IF NOT EXISTS customer_name TEXT DEFAULT '';
+`)
+  .then(() => console.log("Database schema check complete: customer_name column ready."))
+  .catch((err) => console.error("Database schema update failed:", err));
+
 // LOGIN ENDPOINT (Connected to Supabase Database)
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
@@ -75,26 +82,20 @@ app.get('/api/entries', async (req, res) => {
       );
     }
 
-    const formatted = result.rows.map((row: any) => ({
-      id: row.id,
-      employeeName: row.employee_name,
-      business: row.business,
-      date: row.date,
-      startTime: row.start_time,
-      endTime: row.end_time,
-      customer: row.customer,
-      tasks: (() => {
-        try { return JSON.parse(row.task || '[]'); } 
-        catch (e) { return row.task ? [row.task] : []; }
-      })(),
-      materialsList: (() => {
-        try { return JSON.parse(row.materials_list || '[]'); } 
-        catch (e) { return []; }
-      })(),
-      miscellaneous: row.miscellaneous
-    }));
+const formattedEntries = result.rows.map(row => ({
+  id: row.id,
+  employeeName: row.employee_name,
+  business: row.business,
+  date: row.date,
+  startTime: row.start_time,
+  endTime: row.end_time,
+  tasks: typeof row.task === 'string' ? JSON.parse(row.task) : row.task,
+  materialsList: typeof row.materials_list === 'string' ? JSON.parse(row.materials_list) : row.materials_list,
+  miscellaneous: row.miscellaneous,
+  customerName: row.customer_name // <-- Maps the lowercase db column to your UI badge code
+}));
+res.json(formattedEntries);
 
-    res.json(formatted);
   } catch (error) {
     console.error("Error fetching entries:", error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -103,70 +104,28 @@ app.get('/api/entries', async (req, res) => {
 
 // 2. POST NEW ENTRY
 app.post('/api/entries', async (req, res) => {
-  const { employeeName, business, date, startTime, endTime, customer, tasks, materialsList } = req.body;
+  const { employeeName, business, date, startTime, endTime, tasks, miscellaneous, materialsList, customerName } = req.body;
   try {
     await pool.query(
-      `INSERT INTO entries (employee_name, business, date, start_time, end_time, customer, task, materials_list)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      `INSERT INTO entries (employee_name, business, date, start_time, end_time, customer, task, materials_list, customer_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         employeeName,
         business,
         date,
         startTime || '-',
         endTime || '-',
-        customer || 'Allgemein',
-        JSON.stringify(tasks || []), 
-        JSON.stringify(materialsList || [])
+        customerName || 'Allgemein',
+        JSON.stringify(tasks || []),
+        JSON.stringify(materialsList || []),
+        customerName || ''
       ]
     );
     res.json({ message: 'Entry logged successfully!' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
-});
-
-app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
-
-  try {
-    if (username === 'admin' && password === 'admin') {
-      return res.json({ username: 'admin', role: 'admin' });
-    }
-
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Ungültiger Benutzername oder Passwort' });
-    }
-
-    const user = result.rows[0];
-    if (user.password !== password) {
-      return res.status(401).json({ error: 'Ungültiger Benutzername oder Passwort' });
-    }
-
-    res.json({ username: user.username, role: user.role });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/register', async (req, res) => {
-  const { username, password, role } = req.body;
-  try {
-    const userCheck = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-    if (userCheck.rows.length > 0) {
-      return res.status(400).json({ error: 'Benutzername existiert bereits.' });
-    }
-
-    await pool.query(
-      'INSERT INTO users (username, password, role) VALUES ($1, $2, $3)',
-      [username, password, role || 'employee']
-    );
-
-    res.status(201).json({ message: 'Mitarbeiter erfolgreich angelegt!' });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
+}); 
 
 // 3. DELETE ENTRY (Registered safely BEFORE app.listen)
 app.delete('/api/entries/:id', async (req, res) => {
