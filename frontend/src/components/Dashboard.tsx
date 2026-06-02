@@ -274,6 +274,23 @@ useEffect(() => {
                     <option value="Bullaude Waschsalon">Bullaude Waschsalon</option>
                   </select>
                 </div>
+{business === 'Fürst Hauser Gebäudereinigung' && (
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px', color: '#334155' }}>
+              Kunde (Customer):
+            </label>
+            <select 
+              value={customerName || ''} 
+              onChange={(e) => setCustomerName?.(e.target.value)} 
+              style={{ width: '100%', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', backgroundColor: '#fff' }}
+            >
+              <option value="">-- Kunde auswählen (Select Customer) --</option>
+              <option value="Kunde A">Kunde A</option>
+              <option value="Kunde B">Kunde B</option>
+              <option value="Kunde C">Kunde C</option>
+            </select>
+          </div>
+        )}
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '8px', color: '#334155' }}>Mitarbeiter (Employee):</label>
                   <select value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} disabled={user.role === 'employee'} style={{ width: '100%', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', backgroundColor: user.role === 'employee' ? '#f1f5f9' : '#ffffff' }}>
