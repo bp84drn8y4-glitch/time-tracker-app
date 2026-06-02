@@ -104,16 +104,21 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
   }, [business]);
 
   const fetchEntries = async () => {
-    try {
-      const res = await fetch('https://time-tracker-app-w8vf.onrender.com/api/entries');
-      if (res.ok) {
-        const data = await res.json();
-        setEntries(data);
+  try {
+    const res = await fetch('https://time-tracker-app-w8vf.onrender.com/api/entries', {
+      headers: {
+        'x-user-username': username,
+        'x-user-role': role
       }
-    } catch (err) {
-      console.error(err);
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setEntries(data);
     }
-  };
+  } catch (err) {
+    console.error("Error fetching entries:", err);
+  }
+};
 
   useEffect(() => {
     fetchEntries();
@@ -415,40 +420,49 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
               </div>
             )}
 
-            {/* Monthly Summary Statistics Frame */}
-            <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 6px 0', color: '#0f172a' }}>
-                {isAdmin ? '📅 Mitarbeiter Monatsabrechnung (Staff Monthly Totals)' : '📅 Meine Monatsübersicht (My Monthly Summary)'}
-              </h3>
-              <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 20px 0' }}>Zusammenfassung aller geleisteten Arbeitsstunden sortiert nach Monat und Mitarbeiter.</p>
-              
-              <div style={{ backgroundColor: '#0f172a', color: 'white', padding: '12px 16px', borderRadius: '8px 8px 0 0', display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: '700' }}>
-                <span>Monat: 2026-06</span>
-                <span style={{ color: '#94a3b8' }}>Abrechnung</span>
-              </div>
+{/* STAFF MONTHLY TOTALS COMPONENT SECTION */}
+<div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', marginTop: '20px' }}>
+  <h3 style={{ fontSize: '16px', fontWeight: '700', margin: '0 0 12px 0', color: '#0f172a' }}>
+    📅 Mitarbeiter Monatsabrechnung (Staff Monthly Totals)
+  </h3>
+  
+  {(() => {
+    // Group totals by Year-Month combination dynamically
+    const monthlyGroups: { [month: string]: { [employee: string]: number } } = {};
 
-              <div style={{ border: '1px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 8px 8px', backgroundColor: '#ffffff' }}>
-                {isAdmin ? (
-                  getStaffTotals().length === 0 ? (
-                    <div style={{ padding: '16px', color: '#64748b', fontSize: '14px', textAlign: 'center', fontStyle: 'italic' }}>Keine Daten für diesen Monat</div>
-                  ) : (
-                    getStaffTotals().map(([name, hrs]) => (
-                      <div key={name} style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #f1f5f9', fontSize: '14px', alignItems: 'center' }}>
-                        <span style={{ color: '#334155', fontWeight: '600' }}>👤 {name}</span>
-                        <span style={{ fontWeight: '800', color: '#2563eb' }}>{hrs.toFixed(1)} Std.</span>
-                      </div>
-                    ))
-                  )
-                ) : (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 16px', fontSize: '14px', alignItems: 'center' }}>
-                    <span style={{ color: '#334155', fontWeight: '600' }}>📆 Arbeitsstunden Gesamt</span>
-                    <span style={{ fontWeight: '800', color: '#16a34a' }}>
-                      {entries.reduce((sum, e) => sum + calculateHours(e.startTime, e.endTime), 0).toFixed(1)} Std.
-                    </span>
-                  </div>
-                )}
-              </div>
+    entries.forEach((entry: any) => {
+      if (!entry.date) return;
+      const monthKey = entry.date.substring(0, 7); // Extract 'YYYY-MM' from 'YYYY-MM-DD'
+      const emp = entry.employeeName || 'Unbekannt';
+      const hours = calculateHours(entry.startTime, entry.endTime);
+
+      if (!monthlyGroups[monthKey]) monthlyGroups[monthKey] = {};
+      monthlyGroups[monthKey][emp] = (monthlyGroups[monthKey][emp] || 0) + hours;
+    });
+
+    const months = Object.keys(monthlyGroups).sort().reverse();
+
+    if (months.length === 0) {
+      return <div style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '13px' }}>Keine Daten für Abrechnungen vorhanden</div>;
+    }
+
+    return months.map((mKey) => (
+      <div key={mKey} style={{ marginBottom: '20px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+        <div style={{ fontWeight: '800', color: '#1e3a8a', backgroundColor: '#dbeafe', padding: '6px 12px', borderRadius: '6px', display: 'inline-block', marginBottom: '8px', fontSize: '13px' }}>
+          Monat: {mKey}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingLeft: '8px' }}>
+          {Object.entries(monthlyGroups[mKey]).map(([empName, totalHrs]) => (
+            <div key={empName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#334155', borderBottom: '1px dashed #e2e8f0', paddingBottom: '4px' }}>
+              <span>👤 {empName}</span>
+              <span style={{ fontWeight: '700', color: '#2563eb' }}>{totalHrs.toFixed(1)} Std.</span>
             </div>
+          ))}
+        </div>
+      </div>
+    ));
+  })()}
+</div>
 
 {/* History Logs Feed Card - Clean Layout Fix */}
 <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0', width: '100%', marginTop: '24px', clear: 'both' }}>
@@ -536,19 +550,19 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
               </div>
             )}
 
-            {/* FIXED MATERIAL LOGS SECTION */}
-            {((entry.materialsList && entry.materialsList.length > 0) || (entry.materials_list && entry.materials_list.length > 0)) && (
-              <div style={{ fontSize: '13px', borderTop: '1px solid #e2e8f0', paddingTop: '10px', color: '#334155' }}>
-                <div style={{ fontWeight: '700', marginBottom: '6px', color: '#475569' }}>📦 Verbrauchtes Material:</div>
-                <ul style={{ margin: 0, paddingLeft: '20px', listStyleType: 'disc' }}>
-                  {((entry.materialsList || entry.materials_list || [])).map((m, mIdx) => (
-                    <li key={mIdx} style={{ marginBottom: '4px', fontSize: '13px' }}>
-                      <strong>{m.name || m.materialName || 'Material'}</strong> — <span style={{ color: '#2563eb', fontWeight: '700' }}>Bestellt: {m.ordered !== undefined ? m.ordered : m.orderedAmount}</span> | <span style={{ color: '#16a34a', fontWeight: '700' }}>Rücknahme: {m.returned !== undefined ? m.returned : m.returnedAmount}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+		{/* FIXED MATERIAL LOGS RENDERING */}
+{(entry.materialsList && entry.materialsList.length > 0) && (
+  <div style={{ fontSize: '13px', borderTop: '1px solid #e2e8f0', paddingTop: '10px', color: '#334155', marginTop: '10px' }}>
+    <div style={{ fontWeight: '700', marginBottom: '6px', color: '#475569' }}>📦 Verbrauchtes Material:</div>
+    <ul style={{ margin: 0, paddingLeft: '20px', listStyleType: 'disc' }}>
+      {entry.materialsList.map((m: any, mIdx: number) => (
+        <li key={mIdx} style={{ marginBottom: '4px' }}>
+          <strong>{m.materialName || m.name || 'Material'}</strong> — <span style={{ color: '#2563eb', fontWeight: '700' }}>Bestellt: {m.ordered !== undefined ? m.ordered : m.orderedAmount}</span> | <span style={{ color: '#16a34a', fontWeight: '700' }}>Rücknahme: {m.returned !== undefined ? m.returned : m.returnedAmount}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
 
             {/* Miscellaneous Note */}
             {entry.miscellaneous && (
