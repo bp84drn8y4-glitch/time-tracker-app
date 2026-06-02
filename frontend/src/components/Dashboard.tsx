@@ -165,6 +165,7 @@ useEffect(() => {
       // Map tasks to payload if business matches
       tasks: business === 'Fürst Hauser Gebäudereinigung' ? selectedTasks : [],
       miscellaneous,
+      customerName: business === 'Fürst Hauser Gebäudereinigung' ? customerName : '',
       materialsList: materials.filter(m => m.ordered > 0 || m.returned > 0)
     };
 
@@ -176,6 +177,7 @@ useEffect(() => {
       });
       if (res.ok) {
         setMessage('Eintrag erfolgreich gespeichert!');
+	setCustomerName('');
         setSelectedTasks([]);
         if (business === 'Bullaude Waschsalon') {
           setMaterials(BULLAUDE_WASCHSALON_MATERIALS.map(m => ({ ...m })));
@@ -530,6 +532,22 @@ useEffect(() => {
               <div>
                 <div style={{ fontWeight: '700', color: '#1e293b', fontSize: '16px', marginBottom: '4px' }}>👤 {entry.employeeName || entry.employee_name}</div>
                 <span style={{ color: '#475569', fontSize: '12px', fontWeight: '600', backgroundColor: '#e2e8f0', padding: '4px 10px', borderRadius: '6px' }}>🏢 {entry.business}</span>
+		{entry.customerName && (
+          <div style={{
+            display: 'inline-block',
+            marginTop: '6px',
+            marginLeft: '8px',
+            backgroundColor: '#e0f2fe',
+            color: '#0369a1',
+            padding: '4px 10px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: '600',
+            border: '1px solid #bae6fd'
+          }}>
+            👤 Kunde: {entry.customerName}
+          </div>
+        )}
               </div>
               
               {/* ADMIN ACTION CONTROLS */}
