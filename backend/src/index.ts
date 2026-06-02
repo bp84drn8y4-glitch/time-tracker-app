@@ -13,17 +13,45 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// LOGIN ENDPOINT
-app.post('/api/login', (req, res) => {
+// LOGIN ENDPOINT (Connected to Supabase Database)
+app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
 
-  // Simple authentication logic matching your user profiles
-  if (username === 'admin' && password === 'admin') {
-    return res.json({ username: 'admin', role: 'admin' });
-  } else if (username === 'employee' && password === 'password') {
-    return res.json({ username: 'employee', role: 'employee' });
-  } else {
-    return res.status(401).json({ error: 'Ungültiger Benutzername oder Passwort' });
+  try {
+    // 1. Search the database for the matching username
+    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Ungültiger Benutzername oder Passwort' });
+    }
+
+    const user = result.rows[0];
+
+    // 2. Validate password (works for plain text and future encrypted accounts)
+    let isPasswordValid = (password === user.password);
+
+    if (!isPasswordValid && user.password.startsWith('$2')) {
+      try {
+        const bcrypt = require('bcrypt');
+        isPasswordValid = await bcrypt.compare(password, user.password);
+      } catch (err) {
+        console.error("Bcrypt failure:", err);
+      }
+    }
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Ungültiger Benutzername oder Passwort' });
+    }
+
+    // 3. Success! Return user identity details to frontend
+    res.json({ 
+      username: user.username, 
+      role: user.role 
+    });
+
+  } catch (error) {
+    console.error("Login Server Error:", error);
+    res.status(500).json({ error: 'Interner Serverfehler beim Login' });
   }
 });
 
