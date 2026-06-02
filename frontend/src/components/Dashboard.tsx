@@ -27,7 +27,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       
       if (res.ok) {
         // This ensures the deleted item disappears instantly from the screen view list
-	setEntries(prev => prev.filter(e => e.id !== entryId && e._id !== entryId));
+	setEntries(prev => prev.filter(e => String(e.id) !== String(entryId)));
       } else {
         alert("Fehler beim Löschen [Error deleting entry]");
       }
@@ -616,7 +616,7 @@ const handleEditEntry = (entry: any) => {
 {isAdmin && (
   <div style={{ display: 'flex', gap: '10px', marginTop: '12px', paddingTop: '8px', borderTop: '1px dashed #e2e8f0', justifyContent: 'flex-end' }}>
     <button
-	onClick={() => handleDeleteEntry(entry.id)}
+      onClick={() => handleDeleteEntry(entry.id)}
       style={{ padding: '5px 12px', backgroundColor: '#3b82f6', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
     >
       Bearbeiten (Edit)
