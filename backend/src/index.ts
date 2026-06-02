@@ -70,7 +70,7 @@ app.post('/api/entries', async (req, res) => {
   }
 });
 
-// 3. DELETE ENTRY (Registered before listen!)
+// 3. DELETE ENTRY (Registered safely BEFORE app.listen)
 app.delete('/api/entries/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -81,7 +81,7 @@ app.delete('/api/entries/:id', async (req, res) => {
   }
 });
 
-// 4. START SERVER
+// 4. START SERVER LISTENER
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
