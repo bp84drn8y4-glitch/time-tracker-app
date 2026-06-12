@@ -14,17 +14,17 @@ export function Login({ onLoginSuccess }: LoginProps) {
     e.preventDefault();
     setError('');
 
-    try {
-      // 🌐 Connecting directly to your verified clean Render backend instance
-	const API_URL = "https://time-tracker-app-backend-ccj6.onrender.com";
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
+try {
+    const API_URL = "https://time-tracker-app-backend-ccj6.onrender.com";
 
-      const data = await res.json();
+    const res = await fetch(`${API_URL}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
 
-      if (res.ok) {
+    const data = await res.json();
+    if (res.ok) {
         // Successfully log in and pass user details straight to the application
         onLoginSuccess(data);
       } else {
