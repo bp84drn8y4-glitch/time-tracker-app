@@ -12,9 +12,10 @@ const PORT = process.env.PORT || 10000;
 // 1. MIDDLEWARE SETUP
 // ==========================================
 app.use(cors({
-  origin: '*', // Allows your frontend application to communicate with this API
+  origin: 'https://time-tracker-frontend-oekx.onrender.com',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 app.use(express.json());
 
